@@ -18,7 +18,7 @@ namespace NBenchmark.Engine;
 ///         preemption, shared-host jitter) before the timer starts.
 ///     </para>
 /// </summary>
-public static class EnvironmentControl
+internal static class EnvironmentControl
 {
     /// <summary>
     ///     The env var opt-out for the always-on Debug-build / debugger-attached warning.

@@ -1,6 +1,6 @@
 namespace NBenchmark.Stats;
 
-public static class EffectMetrics
+internal static class EffectMetrics
 {
     public const string CliffsDelta = "Cliff's δ";
 }
@@ -18,7 +18,7 @@ public enum MagnitudeLabel
     Large,
 }
 
-public static class MagnitudeLabelExtensions
+internal static class MagnitudeLabelExtensions
 {
     /// <summary>
     ///     Romano, J., Kromrey, J. D., Coraggio, J., &amp; Skowronek, J. (2006).

@@ -8,7 +8,7 @@ namespace NBenchmark.Stats;
 ///     timeline; a structural bottleneck concentrates them, so a low relative spread in
 ///     the discarded tail is the tell.
 /// </summary>
-public static class BimodalDetector
+internal static class BimodalDetector
 {
     // A discarded cluster must contain at least this many samples and at least this
     // fraction of the run before it is worth flagging.

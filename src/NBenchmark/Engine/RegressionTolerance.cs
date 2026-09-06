@@ -27,7 +27,7 @@ namespace NBenchmark.Engine;
 ///         warranted - the helper itself is agnostic to the reason.
 ///     </para>
 /// </remarks>
-public static class RegressionTolerance
+internal static class RegressionTolerance
 {
     /// <summary>
     ///     Computes the effective threshold after applying the relaxation multiplier
@@ -104,7 +104,7 @@ public static class RegressionTolerance
 ///     exceeded, the excess (positive when exceeded), and whether the threshold was
 ///     relaxed (multiplier &gt; 1.0).
 /// </summary>
-public sealed record ToleranceVerdict(
+internal sealed record ToleranceVerdict(
     double MeasuredValue,
     double ConfiguredThreshold,
     double ToleranceMultiplier,

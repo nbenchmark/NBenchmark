@@ -5,7 +5,7 @@ namespace NBenchmark.Stats;
 ///     <c>H</c> statistic, its degrees of freedom (<c>k − 1</c>), the resulting p-value, and
 ///     the number of groups compared.
 /// </summary>
-public readonly record struct KruskalWallisResult(double H, int DegreesOfFreedom, double PValue, int GroupCount)
+internal readonly record struct KruskalWallisResult(double H, int DegreesOfFreedom, double PValue, int GroupCount)
 {
     /// <summary>True when the test was computable (a numeric p-value was produced).</summary>
     public bool IsValid => !double.IsNaN(PValue);
@@ -25,7 +25,7 @@ public readonly record struct KruskalWallisResult(double H, int DegreesOfFreedom
 ///         freedom, which yields the p-value.
 ///     </para>
 /// </summary>
-public static class KruskalWallis
+internal static class KruskalWallis
 {
     /// <summary>Minimum number of groups the test is defined for.</summary>
     public const int MinGroups = 2;

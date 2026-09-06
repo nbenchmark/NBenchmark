@@ -23,7 +23,7 @@ namespace NBenchmark.Integration.Abstractions;
 ///         a 2.80x ratio with a tight confidence interval on each side.
 ///     </para>
 /// </remarks>
-public static class TestMeasurement
+internal static class TestMeasurement
 {
     /// <summary>A measurement, and where it was taken.</summary>
     /// <param name="Refusal">

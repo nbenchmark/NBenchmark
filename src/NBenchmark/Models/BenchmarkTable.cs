@@ -12,7 +12,19 @@ public sealed record BenchmarkTable
     ///     with a <see cref="BenchmarkRow.ClassName" /> column instead of one table per class.
     ///     The harness sets this before calling reporters and clears it after.
     /// </summary>
-    public static bool CrossClassMode { get; set; }
+    /// <remarks>
+    ///     Internal, and read only while a table is being built: every table stamps the mode it was
+    ///     built under onto <see cref="CrossClass" />, so a reporter asks the table in front of it
+    ///     rather than a process-wide flag that may since have been cleared.
+    /// </remarks>
+    internal static bool CrossClassMode { get; set; }
+
+    /// <summary>
+    ///     <c>true</c> when this table combines benchmarks from more than one class, so
+    ///     <see cref="BenchmarkRow.ClassName" /> distinguishes the rows and reporters should render
+    ///     it as a column.
+    /// </summary>
+    public bool CrossClass { get; init; }
 
     public required IReadOnlyList<BenchmarkRow> Rows { get; init; }
     public required string RunAtUtc { get; init; }
@@ -298,6 +310,7 @@ public sealed record BenchmarkTable
         return new BenchmarkTable
         {
             Rows = rows,
+            CrossClass = CrossClassMode,
             ParameterNames = parameterNames,
             RunAtUtc = headerSource?.RunAtUtc.ToString("yyyy-MM-dd HH:mm:ss") ?? "",
             WarmupIterations = headerSource?.WarmupIterations ?? 0,

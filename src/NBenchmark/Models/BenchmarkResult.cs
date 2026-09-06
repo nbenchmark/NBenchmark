@@ -71,9 +71,7 @@ public record BenchmarkResult
     /// <summary>
     ///     The raw per-op nanoseconds of every measured sample, in sample order, before
     ///     outlier trimming. Empty for dry-run, errored, or calibration-derived results.
-    ///     <see cref="TrimmedOrdinals" /> indexes into this collection. Shares storage with
-    ///     <see cref="MeasurementOutcome.RawSamples" /> when the result came from
-    ///     <c>Benchmark.RunRaw</c> / <c>RunRawAsync</c>; treat as read-only.
+    ///     <see cref="TrimmedOrdinals" /> indexes into this collection.
     /// </summary>
     public IReadOnlyList<double> RawSamples { get; init; } = [];
 

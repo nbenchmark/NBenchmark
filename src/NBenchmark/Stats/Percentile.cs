@@ -1,6 +1,6 @@
 namespace NBenchmark.Stats;
 
-public static class Percentile
+internal static class Percentile
 {
     public static double Compute(double[] sorted, double p)
     {

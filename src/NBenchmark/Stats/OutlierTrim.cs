@@ -18,7 +18,7 @@ namespace NBenchmark.Stats;
 ///         detector.
 ///     </para>
 /// </remarks>
-public static class OutlierTrim
+internal static class OutlierTrim
 {
     /// <summary>
     ///     Trims <paramref name="timings" /> and returns only the kept (inlier) samples.

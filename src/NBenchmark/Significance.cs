@@ -10,7 +10,7 @@ namespace NBenchmark.Stats;
 ///     (via <see cref="BenchmarkResult.IsBaseline" /> or fastest-by-median fallback)
 ///     and the p-value verdict assignment logic.
 /// </summary>
-public static class Significance
+internal static class Significance
 {
     public static void ApplyIfEnabled(
         List<BenchmarkResult> results,

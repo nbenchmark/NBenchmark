@@ -54,7 +54,7 @@ var result = Benchmark.Run(
     body:    d => Sort(d));
 ```
 
-This pattern is also available as `RunAsync` (for a `Task`-returning body) and as `RunRaw` / `RunRawAsync` (to keep the raw sample array). 
+This pattern is also available as `RunAsync`, for a `Task`-returning body.
 
 Optional `setup:` and `teardown:` hooks receive the state and run outside the timed window - per iteration, before and after the body. This allows you to reset state for a body that mutates its data between iterations:
 
@@ -74,15 +74,18 @@ var result = Benchmark.Run(
     body:            d => Sort(d));
 ```
 
-### Raw outcome
+### Raw samples
 
-`Benchmark.RunRaw` returns a `MeasurementOutcome` which includes both the `BenchmarkResult` and the raw per-iteration sample array. Use this if you need the underlying data:
+`BenchmarkResult.RawSamples` carries every measured sample, in sample order, before outlier
+trimming:
 
 ```csharp
-var outcome = Benchmark.RunRaw(() => DoWork());
-double[] rawSamples = outcome.RawSamples;     // nanoseconds, before outlier trimming
-BenchmarkResult result = outcome.Result;
+var result = Benchmark.Run(() => DoWork());
+IReadOnlyList<double> rawSamples = result.RawSamples;   // nanoseconds per op
 ```
+
+`result.TrimmedOrdinals` indexes into it, so you can see which samples the outlier detector
+removed.
 
 ## Custom options
 

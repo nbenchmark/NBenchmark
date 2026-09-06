@@ -25,14 +25,14 @@ namespace NBenchmark;
 public static class LaunchCounts
 {
     /// <summary>One launch: measure once, in one process. No between-process estimate.</summary>
-    public const int Single = 1;
+    internal const int Single = 1;
 
     /// <summary>
     ///     The ceiling on a requested launch count, for every path that accepts one - the
     ///     <c>--launch-count</c> flag, <c>WithLaunchCount</c>, <c>[Benchmark(LaunchCount = ...)]</c>
     ///     and the test attributes' <c>LaunchCount</c>.
     /// </summary>
-    public const int Max = 100;
+    internal const int Max = 100;
 
     /// <summary>
     ///     What Harness mode launches when the caller pinned nothing.
@@ -57,7 +57,7 @@ public static class LaunchCounts
     ///         replicates buy little and cost linearly.
     ///     </para>
     /// </remarks>
-    public const int HarnessDefault = 5;
+    internal const int HarnessDefault = 5;
 
     /// <summary>Whether <paramref name="count" /> is a launch count this library will accept.</summary>
     public static bool IsValid(int count) => count is >= Single and <= Max;

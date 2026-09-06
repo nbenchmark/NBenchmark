@@ -9,7 +9,7 @@ namespace NBenchmark.Engine;
 ///     ratio-gate logic that the engine uses for its <c>--threshold-pct</c> exit-code gate,
 ///     instead of reimplementing a weaker version.
 /// </summary>
-public static class ThresholdCheck
+internal static class ThresholdCheck
 {
     /// <summary>
     ///     Returns the regressed benchmark names when one or more candidates exceed the
@@ -169,7 +169,7 @@ public static class ThresholdCheck
 /// <param name="BaselineName">The name of the benchmark the comparison was made against.</param>
 /// <param name="RegressedCandidates">One entry per regressed candidate, in evaluation order.</param>
 /// <param name="RegressedNames">The regressed candidate names, sorted ascending by ordinal.</param>
-public sealed record RegressionVerdict(
+internal sealed record RegressionVerdict(
     bool HasRegression,
     string BaselineName,
     IReadOnlyList<RegressionCandidate> RegressedCandidates,
@@ -196,7 +196,7 @@ public sealed record RegressionVerdict(
 ///         not support. Raising <c>--launch-count</c> is the remedy.
 ///     </para>
 /// </param>
-public sealed record RegressionCandidate(
+internal sealed record RegressionCandidate(
     string Name,
     double CandidateMedian,
     double BaselineMedian,

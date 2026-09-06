@@ -26,53 +26,53 @@ namespace NBenchmark;
 public sealed record InterferenceOptions
 {
     /// <summary>The smallest legal <see cref="RejectionThreshold" />.</summary>
-    public const double MinRejectionThreshold = 0.01;
+    internal const double MinRejectionThreshold = 0.01;
 
     /// <summary>The largest legal <see cref="RejectionThreshold" />.</summary>
-    public const double MaxRejectionThreshold = 1.0;
+    internal const double MaxRejectionThreshold = 1.0;
 
     /// <summary>
     ///     The default <see cref="RejectionThreshold" />: 0.5. A sample whose CPU occupancy falls
     ///     below half this benchmark's own median occupancy is treated as preempted.
     /// </summary>
-    public const double DefaultRejectionThreshold = 0.5;
+    internal const double DefaultRejectionThreshold = 0.5;
 
     /// <summary>The smallest legal <see cref="ProbeCostBudgetFraction" />.</summary>
-    public const double MinProbeCostBudgetFraction = 0.0001;
+    internal const double MinProbeCostBudgetFraction = 0.0001;
 
     /// <summary>The largest legal <see cref="ProbeCostBudgetFraction" />.</summary>
-    public const double MaxProbeCostBudgetFraction = 1.0;
+    internal const double MaxProbeCostBudgetFraction = 1.0;
 
     /// <summary>
     ///     The default <see cref="ProbeCostBudgetFraction" />: 0.05 (5%). Below this, bracketing a
     ///     sample with two thread-CPU-clock reads costs an amount of wall time small enough next to
     ///     the sample it is measuring to be a rounding error rather than a confound.
     /// </summary>
-    public const double DefaultProbeCostBudgetFraction = 0.05;
+    internal const double DefaultProbeCostBudgetFraction = 0.05;
 
     /// <summary>The smallest legal <see cref="KnownSampleFraction" />.</summary>
-    public const double MinKnownSampleFraction = 0.0;
+    internal const double MinKnownSampleFraction = 0.0;
 
     /// <summary>The largest legal <see cref="KnownSampleFraction" />.</summary>
-    public const double MaxKnownSampleFraction = 1.0;
+    internal const double MaxKnownSampleFraction = 1.0;
 
     /// <summary>
     ///     The default <see cref="KnownSampleFraction" />: 0.5. At least half the stream must have a
     ///     known occupancy reading before a median is trusted enough to reject against.
     /// </summary>
-    public const double DefaultKnownSampleFraction = 0.5;
+    internal const double DefaultKnownSampleFraction = 0.5;
 
     /// <summary>The smallest legal <see cref="HighRejectionWarningFraction" />.</summary>
-    public const double MinHighRejectionWarningFraction = 0.0;
+    internal const double MinHighRejectionWarningFraction = 0.0;
 
     /// <summary>The largest legal <see cref="HighRejectionWarningFraction" />.</summary>
-    public const double MaxHighRejectionWarningFraction = 1.0;
+    internal const double MaxHighRejectionWarningFraction = 1.0;
 
     /// <summary>
     ///     The default <see cref="HighRejectionWarningFraction" />: 0.2 (20%). Past this, the host is
     ///     noisy enough that the survivors are a small, possibly biased slice of what was measured.
     /// </summary>
-    public const double DefaultHighRejectionWarningFraction = 0.2;
+    internal const double DefaultHighRejectionWarningFraction = 0.2;
 
     public static readonly InterferenceOptions Default = new();
 

@@ -23,7 +23,7 @@ namespace NBenchmark.Stats;
 ///         <c>CL</c>) the full range is returned - the honest widest bound the data supports.
 ///     </para>
 /// </remarks>
-public static class MedianCi
+internal static class MedianCi
 {
     /// <summary>Above this sample size the normal approximation replaces the exact binomial search.</summary>
     private const int ExactMaxSamples = 50;

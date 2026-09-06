@@ -93,7 +93,7 @@ public sealed class MarkdownReporter : IReporter
 
         foreach (var table in tables)
         {
-            var className = BenchmarkTable.CrossClassMode
+            var className = table.CrossClass
                 ? null
                 : table.Rows.FirstOrDefault(r => !string.IsNullOrEmpty(r.ClassName))?.ClassName;
 
@@ -138,7 +138,7 @@ public sealed class MarkdownReporter : IReporter
 
         // Only when the rows disagree; on a uniform table it would be a constant column.
         var showIsolation = table.MixedIsolationStatuses;
-        var showClass = BenchmarkTable.CrossClassMode && table.Rows.Any(r => r.ClassName.Length > 0);
+        var showClass = table.CrossClass && table.Rows.Any(r => r.ClassName.Length > 0);
         var paramNames = table.ParameterNames;
         var isSimple = detail == ReportDetail.Simple;
 

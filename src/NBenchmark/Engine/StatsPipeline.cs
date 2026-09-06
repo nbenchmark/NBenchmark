@@ -11,7 +11,7 @@ namespace NBenchmark.Engine;
 ///     ingesting OTLP) can run exactly the same statistical processing the engine uses,
 ///     without reimplementing interference rejection, outlier trimming, and warning generation.
 /// </summary>
-public static class StatsPipeline
+internal static class StatsPipeline
 {
     public static ProcessedMeasurements Run(
         double[] rawTimings,
@@ -248,7 +248,7 @@ public static class StatsPipeline
 ///     fence boundaries, the outlier count, the raw allocation samples, the original
 ///     ordinals of every trimmed sample, and any warnings the pipeline produced.
 /// </summary>
-public sealed record ProcessedMeasurements(
+internal sealed record ProcessedMeasurements(
     StatsSummary Stats,
     int MeasuredIterations,
     long? MeanAllocatedBytes,

@@ -6,6 +6,17 @@ namespace NBenchmark.Reporters;
 
 public sealed record ReporterInfo(string Name, string Description);
 
+/// <summary>
+///     The name-to-factory map behind <c>--reporter &lt;name&gt;</c>. A plugin package adds to it from a
+///     <c>[ModuleInitializer]</c>; the built-in reporters seed it.
+/// </summary>
+/// <remarks>
+///     Registration is expected during module initialization and reads afterwards. Every member is
+///     safe to call from any thread, but a reporter registered concurrently with the resolution of a
+///     <c>--reporter</c> name may or may not be seen by it - which is a race in the plugin, not in the
+///     registry, and the reason self-registration belongs in a module initializer rather than in
+///     arbitrary startup code.
+/// </remarks>
 public static class ReporterRegistry
 {
     private static readonly Entry[] _seed =
@@ -106,6 +117,24 @@ public static class ReporterRegistry
 
             _autoAttachEntries.Add(new Entry(name, description, factory));
             _autoAttachedCache = null;
+        }
+    }
+
+    /// <summary>
+    ///     Checks whether a reporter with the given name is registered (in either the explicit
+    ///     opt-in list or the auto-attached list) without constructing an instance - the reporter
+    ///     counterpart of <see cref="NBenchmark.Observers.ObserverRegistry.IsRegistered" />, and used the same way, to
+    ///     validate <c>--reporter</c> without running a factory twice.
+    /// </summary>
+    public static bool IsRegistered(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        EnsureExtensionsLoaded();
+
+        lock (_lock)
+        {
+            return ContainsName(_entries, name) || ContainsName(_autoAttachEntries, name);
         }
     }
 

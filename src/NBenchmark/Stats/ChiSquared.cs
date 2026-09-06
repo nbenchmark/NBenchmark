@@ -7,7 +7,7 @@ namespace NBenchmark.Stats;
 ///     and continued-fraction expansions from <i>Numerical Recipes</i>, which are accurate to
 ///     roughly 1e-12 across the degrees of freedom and statistic magnitudes seen here.
 /// </summary>
-public static class ChiSquared
+internal static class ChiSquared
 {
     private const double Epsilon = 1e-14;
     private const int MaxIterations = 300;

@@ -23,7 +23,7 @@ namespace NBenchmark.Integration.Abstractions;
 ///         silently absorbed.
 ///     </para>
 /// </remarks>
-public static class TestBodyIsolation
+internal static class TestBodyIsolation
 {
     /// <summary>Whether a test method can be measured in a worker, and why not when it cannot.</summary>
     /// <param name="Status">

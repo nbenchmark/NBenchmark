@@ -24,7 +24,7 @@ namespace NBenchmark.Engine;
 ///     caller that only cares whether the host is a shared runner - which is most of them, and all
 ///     of the test-integration ones - should not have to describe its CPU topology to say so.
 /// </remarks>
-public readonly record struct HostAssessment(
+internal readonly record struct HostAssessment(
     int CoreCount,
     bool IsMacOS,
     bool IsSharedRunner,

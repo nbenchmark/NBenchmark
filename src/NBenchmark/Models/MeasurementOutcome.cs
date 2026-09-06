@@ -1,6 +1,6 @@
 namespace NBenchmark;
 
-public sealed record MeasurementOutcome
+internal sealed record MeasurementOutcome
 {
     public required BenchmarkResult Result { get; init; }
 

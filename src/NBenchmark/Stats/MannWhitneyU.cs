@@ -18,7 +18,7 @@ namespace NBenchmark.Stats;
 ///         the approximation error is mathematically negligible.
 ///     </para>
 /// </summary>
-public static class MannWhitneyU
+internal static class MannWhitneyU
 {
     /// <summary>
     ///     Inclusive upper bound on the combined sample size (<c>n1 + n2</c>) for which the
@@ -344,4 +344,4 @@ public static class MannWhitneyU
 ///     samples in group B (the candidate) tend to be larger (slower) than group A (the
 ///     baseline). <c>NaN</c> when the test could not run.
 /// </param>
-public readonly record struct MannWhitneyUResult(double PValue, double CliffsDelta);
+internal readonly record struct MannWhitneyUResult(double PValue, double CliffsDelta);

@@ -25,42 +25,42 @@ namespace NBenchmark;
 public sealed record DriftCanaryOptions
 {
     /// <summary>The smallest legal <see cref="Samples" />. Below four there is no usable median.</summary>
-    public const int MinSamples = 4;
+    internal const int MinSamples = 4;
 
     /// <summary>The largest legal <see cref="Samples" />.</summary>
-    public const int MaxSamples = 1024;
+    internal const int MaxSamples = 1024;
 
     /// <summary>
     ///     The default <see cref="Samples" />: 32, matching
     ///     <see cref="AutoTuneOptions.JitterCalibrationSamples" /> so the canary and the pre-flight
     ///     jitter probe read the same workload the same way.
     /// </summary>
-    public const int DefaultSamples = 32;
+    internal const int DefaultSamples = 32;
 
     /// <summary>The smallest legal <see cref="WorkPerSample" />.</summary>
-    public const int MinWorkPerSample = 64;
+    internal const int MinWorkPerSample = 64;
 
     /// <summary>The largest legal <see cref="WorkPerSample" />.</summary>
-    public const int MaxWorkPerSample = 1 << 20;
+    internal const int MaxWorkPerSample = 1 << 20;
 
     /// <summary>
     ///     The default <see cref="WorkPerSample" />: 4,096, matching
     ///     <see cref="AutoTuneOptions.JitterCalibrationWorkPerSample" />.
     /// </summary>
-    public const int DefaultWorkPerSample = 4096;
+    internal const int DefaultWorkPerSample = 4096;
 
     /// <summary>The smallest legal <see cref="MinimumReportableDrift" />.</summary>
-    public const double MinReportableDrift = 0.0;
+    internal const double MinReportableDrift = 0.0;
 
     /// <summary>The largest legal <see cref="MinimumReportableDrift" />.</summary>
-    public const double MaxReportableDrift = 1.0;
+    internal const double MaxReportableDrift = 1.0;
 
     /// <summary>
     ///     The default <see cref="MinimumReportableDrift" />: 0.01 (1%). Below that the canary is
     ///     measuring its own noise rather than the host's speed, and a warning drawn from it would
     ///     fire on every quiet run.
     /// </summary>
-    public const double DefaultMinimumReportableDrift = 0.01;
+    internal const double DefaultMinimumReportableDrift = 0.01;
 
     /// <summary>The defaults: on, 32 samples of 4,096 iterations, warning past 1% drift.</summary>
     public static readonly DriftCanaryOptions Default = new();

@@ -1,6 +1,6 @@
 namespace NBenchmark.Integration.Abstractions;
 
-public static class MeasurementOptionsBuilder
+internal static class MeasurementOptionsBuilder
 {
     public static MeasurementOptions Build(IPerformanceThresholds thresholds)
     {

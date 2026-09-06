@@ -21,7 +21,7 @@ namespace NBenchmark.Integration.Abstractions;
 ///         ratio - so a ratio across that boundary reports the processes, not the code.
 ///     </para>
 /// </remarks>
-public static class PerformanceGate
+internal static class PerformanceGate
 {
     /// <summary>
     ///     The result of a gate evaluation: <paramref name="Violations" /> fail the test,

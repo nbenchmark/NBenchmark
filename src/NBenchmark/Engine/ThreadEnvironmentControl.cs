@@ -30,7 +30,7 @@ namespace NBenchmark.Engine;
 ///         a host declined a scheduler hint.
 ///     </para>
 /// </summary>
-public static class ThreadEnvironmentControl
+internal static class ThreadEnvironmentControl
 {
     /// <summary>
     ///     Once-per-process guard for the "quality of service could not be raised" warning. The

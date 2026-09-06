@@ -57,7 +57,7 @@ public sealed class ConsoleReporter : IReporter
         {
             foreach (var table in tables)
             {
-                var className = BenchmarkTable.CrossClassMode
+                var className = table.CrossClass
                     ? null
                     : table.Rows.FirstOrDefault(r => !string.IsNullOrEmpty(r.ClassName))?.ClassName;
 
@@ -76,7 +76,7 @@ public sealed class ConsoleReporter : IReporter
 
         foreach (var table in tables)
         {
-            var className = BenchmarkTable.CrossClassMode
+            var className = table.CrossClass
                 ? null
                 : table.Rows.FirstOrDefault(r => !string.IsNullOrEmpty(r.ClassName))?.ClassName;
 
@@ -235,7 +235,7 @@ public sealed class ConsoleReporter : IReporter
         // reading the table and misreading it.
         var showIsolation = benchTable.MixedIsolationStatuses;
         var isSimple = detail == ReportDetail.Simple;
-        var showClass = BenchmarkTable.CrossClassMode && benchTable.Rows.Any(r => r.ClassName.Length > 0);
+        var showClass = benchTable.CrossClass && benchTable.Rows.Any(r => r.ClassName.Length > 0);
 
         // A ratio is present whenever a row was ranked against a reference - either a competing
         // benchmark in its parameter group or, for a single method swept across parameter values,
@@ -1216,7 +1216,7 @@ public sealed class ConsoleReporter : IReporter
     }
 
     [ModuleInitializer]
-    public static void Register() =>
+    internal static void Register() =>
         ReporterRegistry.Register(
             "console",
             "Console output (Spectre.Console table + bar chart)",

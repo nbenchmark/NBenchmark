@@ -1,6 +1,6 @@
 namespace NBenchmark.Stats;
 
-public sealed class StatsSummary
+internal sealed class StatsSummary
 {
     public double Mean { get; init; }
     public double Median { get; init; }
@@ -306,4 +306,4 @@ public sealed class StatsSummary
     }
 }
 
-public readonly record struct AllocationStats(long Mean, long P50, long P95, long Max);
+internal readonly record struct AllocationStats(long Mean, long P50, long P95, long Max);

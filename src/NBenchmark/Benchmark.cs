@@ -68,28 +68,28 @@ public static class Benchmark
         CancellationToken cancellationToken = default)
         => (await RunRawAsync(action, options, name, progress, cancellationToken).ConfigureAwait(false)).Result;
 
-    public static MeasurementOutcome RunRaw(Action action,
+    internal static MeasurementOutcome RunRaw(Action action,
         MeasurementOptions? options = null,
         string name = "Benchmark",
         IBenchmarkProgress? progress = null,
         CancellationToken cancellationToken = default)
         => Measure(action, options, name, progress, cancellationToken);
 
-    public static MeasurementOutcome RunRaw<T>(Func<T> action,
+    internal static MeasurementOutcome RunRaw<T>(Func<T> action,
         MeasurementOptions? options = null,
         string name = "Benchmark",
         IBenchmarkProgress? progress = null,
         CancellationToken cancellationToken = default)
         => Measure(action, options, name, progress, cancellationToken);
 
-    public static Task<MeasurementOutcome> RunRawAsync(Func<Task> action,
+    internal static Task<MeasurementOutcome> RunRawAsync(Func<Task> action,
         MeasurementOptions? options = null,
         string name = "Benchmark",
         IBenchmarkProgress? progress = null,
         CancellationToken cancellationToken = default)
         => MeasureAsync(action, options, name, progress, cancellationToken);
 
-    public static Task<MeasurementOutcome> RunRawAsync<T>(Func<Task<T>> action,
+    internal static Task<MeasurementOutcome> RunRawAsync<T>(Func<Task<T>> action,
         MeasurementOptions? options = null,
         string name = "Benchmark",
         IBenchmarkProgress? progress = null,
@@ -177,7 +177,7 @@ public static class Benchmark
         => (await RunRawAsync(prepare, body, setup, teardown, options, name, progress, cancellationToken).ConfigureAwait(false)).Result;
 
     /// <inheritdoc cref="Run{TState}(Func{TState}, Action{TState}, Action{TState}?, Action{TState}?, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
-    public static MeasurementOutcome RunRaw<TState>(Func<TState> prepare, Action<TState> body,
+    internal static MeasurementOutcome RunRaw<TState>(Func<TState> prepare, Action<TState> body,
         Action<TState>? setup = null, Action<TState>? teardown = null,
         MeasurementOptions? options = null,
         string name = "Benchmark",
@@ -190,7 +190,7 @@ public static class Benchmark
             .GetResult();
 
     /// <inheritdoc cref="Run{TState}(Func{TState}, Action{TState}, Action{TState}?, Action{TState}?, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
-    public static MeasurementOutcome RunRaw<TState, T>(Func<TState> prepare, Func<TState, T> body,
+    internal static MeasurementOutcome RunRaw<TState, T>(Func<TState> prepare, Func<TState, T> body,
         Action<TState>? setup = null, Action<TState>? teardown = null,
         MeasurementOptions? options = null,
         string name = "Benchmark",
@@ -203,7 +203,7 @@ public static class Benchmark
             .GetResult();
 
     /// <inheritdoc cref="Run{TState}(Func{TState}, Action{TState}, Action{TState}?, Action{TState}?, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
-    public static Task<MeasurementOutcome> RunRawAsync<TState>(Func<TState> prepare, Func<TState, Task> body,
+    internal static Task<MeasurementOutcome> RunRawAsync<TState>(Func<TState> prepare, Func<TState, Task> body,
         Action<TState>? setup = null, Action<TState>? teardown = null,
         MeasurementOptions? options = null,
         string name = "Benchmark",
@@ -214,7 +214,7 @@ public static class Benchmark
             options, name, progress, cancellationToken);
 
     /// <inheritdoc cref="Run{TState}(Func{TState}, Action{TState}, Action{TState}?, Action{TState}?, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
-    public static Task<MeasurementOutcome> RunRawAsync<TState, T>(Func<TState> prepare, Func<TState, Task<T>> body,
+    internal static Task<MeasurementOutcome> RunRawAsync<TState, T>(Func<TState> prepare, Func<TState, Task<T>> body,
         Action<TState>? setup = null, Action<TState>? teardown = null,
         MeasurementOptions? options = null,
         string name = "Benchmark",
@@ -303,7 +303,7 @@ public static class Benchmark
             .ConfigureAwait(false)).Result;
 
     /// <inheritdoc cref="Run{TArg, TState}(Func{TArg, TState}, TArg, Action{TState}, Action{TState}?, Action{TState}?, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
-    public static MeasurementOutcome RunRaw<TArg, TState>(
+    internal static MeasurementOutcome RunRaw<TArg, TState>(
         Func<TArg, TState> prepare, TArg prepareArgument, Action<TState> body,
         Action<TState>? setup = null, Action<TState>? teardown = null,
         MeasurementOptions? options = null,
@@ -318,7 +318,7 @@ public static class Benchmark
             .GetResult();
 
     /// <inheritdoc cref="Run{TArg, TState}(Func{TArg, TState}, TArg, Action{TState}, Action{TState}?, Action{TState}?, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
-    public static MeasurementOutcome RunRaw<TArg, TState, T>(
+    internal static MeasurementOutcome RunRaw<TArg, TState, T>(
         Func<TArg, TState> prepare, TArg prepareArgument, Func<TState, T> body,
         Action<TState>? setup = null, Action<TState>? teardown = null,
         MeasurementOptions? options = null,
@@ -333,7 +333,7 @@ public static class Benchmark
             .GetResult();
 
     /// <inheritdoc cref="Run{TArg, TState}(Func{TArg, TState}, TArg, Action{TState}, Action{TState}?, Action{TState}?, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
-    public static Task<MeasurementOutcome> RunRawAsync<TArg, TState>(
+    internal static Task<MeasurementOutcome> RunRawAsync<TArg, TState>(
         Func<TArg, TState> prepare, TArg prepareArgument, Func<TState, Task> body,
         Action<TState>? setup = null, Action<TState>? teardown = null,
         MeasurementOptions? options = null,
@@ -346,7 +346,7 @@ public static class Benchmark
             options, name, progress, cancellationToken);
 
     /// <inheritdoc cref="Run{TArg, TState}(Func{TArg, TState}, TArg, Action{TState}, Action{TState}?, Action{TState}?, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
-    public static Task<MeasurementOutcome> RunRawAsync<TArg, TState, T>(
+    internal static Task<MeasurementOutcome> RunRawAsync<TArg, TState, T>(
         Func<TArg, TState> prepare, TArg prepareArgument, Func<TState, Task<T>> body,
         Action<TState>? setup = null, Action<TState>? teardown = null,
         MeasurementOptions? options = null,
@@ -423,7 +423,7 @@ public static class Benchmark
             .ConfigureAwait(false)).Result;
 
     /// <inheritdoc cref="Run{TState1, TState2}(Func{TState1}, Func{TState2}, Action{TState1, TState2}, Action{TState1, TState2}?, Action{TState1, TState2}?, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
-    public static MeasurementOutcome RunRaw<TState1, TState2>(
+    internal static MeasurementOutcome RunRaw<TState1, TState2>(
         Func<TState1> prepare1, Func<TState2> prepare2, Action<TState1, TState2> body,
         Action<TState1, TState2>? setup = null, Action<TState1, TState2>? teardown = null,
         MeasurementOptions? options = null,
@@ -437,7 +437,7 @@ public static class Benchmark
             .GetResult();
 
     /// <inheritdoc cref="Run{TState1, TState2}(Func{TState1}, Func{TState2}, Action{TState1, TState2}, Action{TState1, TState2}?, Action{TState1, TState2}?, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
-    public static MeasurementOutcome RunRaw<TState1, TState2, T>(
+    internal static MeasurementOutcome RunRaw<TState1, TState2, T>(
         Func<TState1> prepare1, Func<TState2> prepare2, Func<TState1, TState2, T> body,
         Action<TState1, TState2>? setup = null, Action<TState1, TState2>? teardown = null,
         MeasurementOptions? options = null,
@@ -451,7 +451,7 @@ public static class Benchmark
             .GetResult();
 
     /// <inheritdoc cref="Run{TState1, TState2}(Func{TState1}, Func{TState2}, Action{TState1, TState2}, Action{TState1, TState2}?, Action{TState1, TState2}?, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
-    public static Task<MeasurementOutcome> RunRawAsync<TState1, TState2>(
+    internal static Task<MeasurementOutcome> RunRawAsync<TState1, TState2>(
         Func<TState1> prepare1, Func<TState2> prepare2, Func<TState1, TState2, Task> body,
         Action<TState1, TState2>? setup = null, Action<TState1, TState2>? teardown = null,
         MeasurementOptions? options = null,
@@ -463,7 +463,7 @@ public static class Benchmark
             options, name, progress, cancellationToken);
 
     /// <inheritdoc cref="Run{TState1, TState2}(Func{TState1}, Func{TState2}, Action{TState1, TState2}, Action{TState1, TState2}?, Action{TState1, TState2}?, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
-    public static Task<MeasurementOutcome> RunRawAsync<TState1, TState2, T>(
+    internal static Task<MeasurementOutcome> RunRawAsync<TState1, TState2, T>(
         Func<TState1> prepare1, Func<TState2> prepare2, Func<TState1, TState2, Task<T>> body,
         Action<TState1, TState2>? setup = null, Action<TState1, TState2>? teardown = null,
         MeasurementOptions? options = null,

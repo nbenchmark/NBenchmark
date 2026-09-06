@@ -7,13 +7,13 @@ namespace NBenchmark.Stats;
 ///     shrink the computed interval faster than the truth warrants, so an honest-looking ±2.5%
 ///     can undercover. These two cheap checks turn that silent failure into a visible warning.
 /// </summary>
-public static class SampleQuality
+internal static class SampleQuality
 {
     /// <summary>Below this raw sample count the checks are skipped - too little power to be meaningful.</summary>
-    public const int MinSamplesForChecks = 50;
+    internal const int MinSamplesForChecks = 50;
 
     /// <summary>Split-half Mann-Whitney p-value below which a drift warning fires.</summary>
-    public const double DriftPValueThreshold = 0.001;
+    internal const double DriftPValueThreshold = 0.001;
 
     /// <summary>
     ///     The relative gap between the two half-medians a drift must also exceed before the warning
@@ -28,10 +28,10 @@ public static class SampleQuality
     ///         warning about drift that matters.
     ///     </para>
     /// </summary>
-    public const double DriftRelativeThreshold = 0.10;
+    internal const double DriftRelativeThreshold = 0.10;
 
     /// <summary>Lag-1 autocorrelation above which a dependence warning fires.</summary>
-    public const double AutocorrelationThreshold = 0.5;
+    internal const double AutocorrelationThreshold = 0.5;
 
     /// <summary>
     ///     Runs the drift and autocorrelation checks over the raw stream in arrival order and

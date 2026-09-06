@@ -112,7 +112,7 @@ public readonly record struct EffectSize(
     EffectDirection Direction = EffectDirection.None,
     double? PracticalValue = null);
 
-public static class EffectSizeFactory
+internal static class EffectSizeFactory
 {
     /// <summary>
     ///     Creates the built-in Cliff's-delta effect payload with Romano magnitude labels.

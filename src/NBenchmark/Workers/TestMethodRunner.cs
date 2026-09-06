@@ -12,7 +12,7 @@ namespace NBenchmark.Workers;
 ///     protocol is internal to the core - the integrations should be able to ask for an isolated
 ///     measurement without being able to hand-assemble a wire request.
 /// </remarks>
-public static class TestMethodRunner
+internal static class TestMethodRunner
 {
     /// <summary>One method to measure, and the name to report it under.</summary>
     /// <param name="Arguments">

@@ -1,6 +1,6 @@
 namespace NBenchmark.Integration.Abstractions;
 
-public static class MetricsFormatter
+internal static class MetricsFormatter
 {
     public static string Format(BenchmarkResult result)
     {

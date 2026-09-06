@@ -7,7 +7,7 @@ using NBenchmark.Engine;
 
 namespace NBenchmark.Discovery;
 
-public sealed class BenchmarkDiscoverer
+internal sealed class BenchmarkDiscoverer
 {
     private readonly InstanceLifetime _defaultInstanceLifetime;
     private readonly bool _factoryResolvedInstances;

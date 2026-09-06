@@ -29,7 +29,7 @@ namespace NBenchmark.Stats;
 ///         one replicate in which <i>both</i> benchmarks happened to run slowly.
 ///     </para>
 /// </remarks>
-public static class LogRatio
+internal static class LogRatio
 {
     /// <summary>
     ///     The paired ratio of <paramref name="candidate" /> to <paramref name="baseline" />, or

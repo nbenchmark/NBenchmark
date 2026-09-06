@@ -9,7 +9,7 @@ namespace NBenchmark.Engine;
 ///     stats computation, <see cref="BenchmarkResult" /> construction, error
 ///     translation, JIT-elision, and warmup progress emission.
 /// </summary>
-public sealed class BenchmarkRunner
+internal sealed class BenchmarkRunner
 {
     // ---------- JIT-elision sink ----------
 

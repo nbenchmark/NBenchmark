@@ -27,7 +27,7 @@ public readonly record struct ShiftEstimate(double Value, double Lower, double U
 ///     auto-tune produces the materialisation is still well under a second; if an extreme n ever
 ///     bites, raise a cap on both statistics together rather than reintroducing the split.
 /// </remarks>
-public static class HodgesLehmann
+internal static class HodgesLehmann
 {
     /// <summary>Minimum samples required in each group.</summary>
     private const int MinPerGroup = 2;

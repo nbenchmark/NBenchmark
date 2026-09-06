@@ -63,7 +63,7 @@ internal static class AwaitableResult
         return $"'{name}' returns {resultType.Name}, which the synchronous measurement path cannot "
                + "measure: the call returns at the body's first incomplete await, so the timing would "
                + "cover only the part that ran before it. Use the asynchronous entry point "
-               + "(RunAsync / AddAsync / RunRawAsync), converting a ValueTask first with "
+               + "(RunAsync / AddAsync), converting a ValueTask first with "
                + "`() => Method().AsTask()`.";
     }
 }

@@ -7,7 +7,7 @@ namespace NBenchmark.Stats;
 ///     <see cref="HolmBonferroni" /> adjusts the raw p-values so the family-wise error
 ///     rate stays at or below the per-comparison significance level.
 /// </summary>
-public static class MultipleComparisons
+internal static class MultipleComparisons
 {
     public static double[] HolmBonferroni(IReadOnlyList<double> rawPValues)
     {

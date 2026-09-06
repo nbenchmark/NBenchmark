@@ -18,7 +18,12 @@ public static class BenchmarkAssert
         }
     }
 
-    public static void ResetHostAssessment()
+    /// <summary>
+    ///     Clears the cached host assessment so the next gate re-measures the machine. A test seam:
+    ///     nothing in a consumer's test run wants a stale reading, and nothing but a test wants to
+    ///     control when the reading is taken.
+    /// </summary>
+    internal static void ResetHostAssessment()
     {
         lock (HostLock)
         {
@@ -26,7 +31,12 @@ public static class BenchmarkAssert
         }
     }
 
-    public static void SetHostAssessment(HostAssessment assessment)
+    /// <summary>
+    ///     Pins the host assessment the gates run against. The counterpart of
+    ///     <see cref="ResetHostAssessment" />, and internal for the same reason - it also takes
+    ///     <see cref="HostAssessment" />, which is engine detail.
+    /// </summary>
+    internal static void SetHostAssessment(HostAssessment assessment)
     {
         lock (HostLock)
         {

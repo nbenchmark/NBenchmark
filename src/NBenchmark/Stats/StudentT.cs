@@ -11,7 +11,7 @@ namespace NBenchmark.Stats;
 ///     and the Cornish-Fisher expansion (Abramowitz &amp; Stegun 26.7.5) for higher df,
 ///     which is accurate to &lt; 1% for df ≥ 3 and converges to the normal as df → ∞.
 /// </remarks>
-public static class StudentT
+internal static class StudentT
 {
     /// <summary>
     ///     Two-tailed critical t value for the given confidence level and degrees of freedom.

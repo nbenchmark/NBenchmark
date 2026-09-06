@@ -25,7 +25,7 @@ namespace NBenchmark.Integration.Abstractions;
 ///         callers (including Studio) should prefer <see cref="CheckStructured" />.
 ///     </para>
 /// </remarks>
-public static class RelativeComparison
+internal static class RelativeComparison
 {
     /// <summary>
     ///     Compares <paramref name="candidateResult" /> against
@@ -184,7 +184,7 @@ public static class RelativeComparison
 ///     co-resident across two or more replicates. <c>null</c> for a single-replicate comparison, where
 ///     the ratio is a point estimate and nothing in it says whether a re-run would agree.
 /// </param>
-public sealed record RelativeComparisonVerdict(
+internal sealed record RelativeComparisonVerdict(
     IReadOnlyList<string> Violations,
     double Ratio,
     double PValue,

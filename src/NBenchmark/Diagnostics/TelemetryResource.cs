@@ -39,7 +39,7 @@ namespace NBenchmark.Diagnostics;
 ///         logic.
 ///     </para>
 /// </remarks>
-public static class TelemetryResource
+internal static class TelemetryResource
 {
     private static IReadOnlyDictionary<string, object?>? _cached;
 

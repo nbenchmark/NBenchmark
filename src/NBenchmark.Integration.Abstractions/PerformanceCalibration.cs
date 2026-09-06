@@ -16,7 +16,7 @@ namespace NBenchmark.Integration.Abstractions;
 ///         the host, where it is the correct comparison rather than a compromise.
 ///     </para>
 /// </remarks>
-public static class PerformanceCalibration
+internal static class PerformanceCalibration
 {
     private static readonly Lazy<CalibrationResult> Cached = new(CalibrationStandard.Measure);
 

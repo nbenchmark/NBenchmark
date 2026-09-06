@@ -14,6 +14,13 @@ public sealed record ObserverInfo(string Name, string Description);
 ///     <see cref="Register(string, string, Func{IMeasurementObserver})" />, exactly as
 ///     <c>NBenchmark.Reporters.Console</c> registers into <c>ReporterRegistry</c>.
 /// </summary>
+/// <remarks>
+///     Registration is expected during module initialization and reads afterwards. Every member is
+///     safe to call from any thread, but an observer registered concurrently with the resolution of
+///     an <c>--observer</c> name may or may not be seen by it - which is a race in the plugin, not in
+///     the registry, and the reason self-registration belongs in a module initializer rather than in
+///     arbitrary startup code.
+/// </remarks>
 public static class ObserverRegistry
 {
     private static List<Entry> _entries = [];

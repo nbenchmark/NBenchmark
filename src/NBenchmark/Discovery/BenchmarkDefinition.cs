@@ -3,7 +3,7 @@ using NBenchmark.Attributes;
 
 namespace NBenchmark.Discovery;
 
-public sealed record BenchmarkSuiteDefinition(
+internal sealed record BenchmarkSuiteDefinition(
     Type Type,
     IReadOnlyList<BenchmarkMethodDefinition> Benchmarks,
     Action<object>? SetupDelegate = null,
@@ -15,7 +15,7 @@ public sealed record BenchmarkSuiteDefinition(
     internal IReadOnlyList<RuntimeMoniker> Runtimes { get; init; } = [];
 }
 
-public sealed record BenchmarkMethodDefinition(
+internal sealed record BenchmarkMethodDefinition(
     MethodInfo Method,
     BenchmarkAttribute Attribute
 )

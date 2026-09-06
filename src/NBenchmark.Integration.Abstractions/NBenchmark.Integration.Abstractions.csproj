@@ -16,6 +16,23 @@
     <ProjectReference Include="..\NBenchmark\NBenchmark.csproj"/>
   </ItemGroup>
 
+  <!--
+    The three framework packages are the only callers of the measurement plumbing here -
+    TestBodyBuilder, TestMeasurement, PerformanceGate and friends. Those types are shared
+    implementation, not contract: a consumer reaches this package for PerformanceThresholds and
+    BenchmarkAssert, and pulling a dozen generically-named helpers into scope alongside them is a
+    cost with no matching use. They are internal, and reachable from the packages that build on them.
+  -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="NBenchmark.Integration.xUnit"/>
+    <InternalsVisibleTo Include="NBenchmark.Integration.NUnit"/>
+    <InternalsVisibleTo Include="NBenchmark.Integration.MSTest"/>
+    <InternalsVisibleTo Include="NBenchmark.Integration.xUnit.Tests"/>
+    <InternalsVisibleTo Include="NBenchmark.Integration.NUnit.Tests"/>
+    <InternalsVisibleTo Include="NBenchmark.Integration.MSTest.Tests"/>
+    <InternalsVisibleTo Include="NBenchmark.Tests"/>
+  </ItemGroup>
+
   <!-- Shared package metadata: authors, repository URL, source link, symbols, XML docs. -->
   <Import Project="../../Release.props"/>
 

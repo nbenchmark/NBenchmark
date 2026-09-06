@@ -6,7 +6,7 @@ namespace NBenchmark.Engine;
 ///     heap allocations when used by <c>BenchmarkSuite</c> and
 ///     <c>BenchmarkHarness</c>.
 /// </summary>
-public readonly record struct RunSpec
+internal readonly record struct RunSpec
 {
     public RunSpec()
     {

@@ -34,7 +34,7 @@ namespace NBenchmark.Stats;
 ///         set by default) and by the achieved CI width on the diagnostic, not by this interval.
 ///     </para>
 /// </remarks>
-public static class WinsorizedError
+internal static class WinsorizedError
 {
     /// <summary>
     ///     Computes the Winsorized standard error, margin of error and Winsorized standard
@@ -165,7 +165,7 @@ public readonly record struct TrimContext(double[] SortedAll, int TrimmedLow, in
 /// <param name="StandardError"><c>s_w × sqrt(n) / h</c> - the standard error of the trimmed mean.</param>
 /// <param name="MarginOfError"><c>t* × StandardError</c> at the requested confidence level.</param>
 /// <param name="DegreesOfFreedom"><c>h - 1</c>, where <c>h</c> is the number of retained samples.</param>
-public readonly record struct WinsorizedSpread(
+internal readonly record struct WinsorizedSpread(
     double StandardDeviation,
     double StandardError,
     double MarginOfError,

@@ -21,7 +21,7 @@ namespace NBenchmark.Integration.Abstractions;
 ///         method directly.
 ///     </para>
 /// </remarks>
-public static class TestBodyBuilder
+internal static class TestBodyBuilder
 {
     /// <summary>
     ///     Builds a delegate that invokes <paramref name="method" />, or returns <c>false</c> when
@@ -191,7 +191,7 @@ public static class TestBodyBuilder
 ///         type stores the value directly.
 ///     </para>
 /// </remarks>
-public static class ReturnSink<T>
+internal static class ReturnSink<T>
 {
     public static T? Hole;
 }

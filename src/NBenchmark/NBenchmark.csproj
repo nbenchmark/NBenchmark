@@ -27,6 +27,25 @@
     <InternalsVisibleTo Include="NBenchmark.DependencyInjection.Tests"/>
 
     <!--
+      NBenchmark.Engine, .Workers, .Discovery and .Diagnostics are the measurement engine, not the
+      contract. The satellite packages build on them - the integration packages run test methods
+      through the same runner the harness uses, and the exporters read the discovery and telemetry
+      shapes - which is what internal access is for. Publishing them instead put twenty engine types,
+      several under names as common as Outcome and Subject, into every consumer's IntelliSense.
+    -->
+    <InternalsVisibleTo Include="NBenchmark.Integration.Abstractions"/>
+    <InternalsVisibleTo Include="NBenchmark.Integration.xUnit"/>
+    <InternalsVisibleTo Include="NBenchmark.Integration.NUnit"/>
+    <InternalsVisibleTo Include="NBenchmark.Integration.MSTest"/>
+    <InternalsVisibleTo Include="NBenchmark.Integration.xUnit.Tests"/>
+    <InternalsVisibleTo Include="NBenchmark.Integration.NUnit.Tests"/>
+    <InternalsVisibleTo Include="NBenchmark.Integration.MSTest.Tests"/>
+    <InternalsVisibleTo Include="NBenchmark.Reporters.Console"/>
+    <InternalsVisibleTo Include="NBenchmark.Reporters.Console.Tests"/>
+    <InternalsVisibleTo Include="NBenchmark.Exporters.OpenTelemetry"/>
+    <InternalsVisibleTo Include="NBenchmark.Exporters.OpenTelemetry.Tests"/>
+
+    <!--
       The measurement worker. It is a separate process but not a separate design: it runs the
       engine's own measurement loop and the shared DiscoveredGroupExecutor, so an isolated number
       and an in-process number differ only by the runtime configuration the process was started

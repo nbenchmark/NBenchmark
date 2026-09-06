@@ -15,11 +15,11 @@ namespace NBenchmark;
 public record MeasurementOptions
 {
     internal const double PercentileEqualityTolerance = 1e-9;
-    public const int MinIterations = 0;
-    public const int MaxIterations = 100_000;
+    internal const int MinIterations = 0;
+    internal const int MaxIterations = 100_000;
 
     /// <summary>The ceiling on a <em>pinned</em> <see cref="WarmupIterations" /> (and <c>--warmup</c>).</summary>
-    public const int MaxWarmupIterations = 10_000;
+    internal const int MaxWarmupIterations = 10_000;
 
     /// <summary>
     ///     The ceiling on <em>auto</em>-resolved warmup (<see cref="AutoTuneOptions.MaxWarmup" /> and
@@ -28,17 +28,17 @@ public record MeasurementOptions
     ///     <see cref="AutoTuneOptions.MinWarmupTime" />, and a count ceiling that binds first would
     ///     silently defeat that floor.
     /// </summary>
-    public const int MaxAutoWarmupIterations = 100_000;
+    internal const int MaxAutoWarmupIterations = 100_000;
 
-    public const int MaxOpsPerSampleLimit = 1 << 24;
-    public const int MinHistogramBucketCount = 5;
-    public const int MaxHistogramBucketCount = 100;
+    internal const int MaxOpsPerSampleLimit = 1 << 24;
+    internal const int MinHistogramBucketCount = 5;
+    internal const int MaxHistogramBucketCount = 100;
 
     /// <summary>
     ///     Default ceiling on how many raw samples an isolated worker sends back per benchmark.
     ///     See <see cref="MaxRawSamples" />.
     /// </summary>
-    public const int DefaultMaxRawSamples = 4096;
+    internal const int DefaultMaxRawSamples = 4096;
 
     /// <summary><see cref="MaxRawSamples" /> value meaning "return every sample".</summary>
     public const int UnboundedRawSamples = 0;
@@ -47,7 +47,7 @@ public record MeasurementOptions
     ///     Default ceiling on the encoded size of the values a benchmark's closure may send to a
     ///     measurement worker. See <see cref="MaxTransferredStateBytes" />.
     /// </summary>
-    public const int DefaultMaxTransferredStateBytes = 8 * 1024 * 1024;
+    internal const int DefaultMaxTransferredStateBytes = 8 * 1024 * 1024;
 
     internal static readonly IReadOnlyList<double> DefaultReportedPercentiles =
         Array.AsReadOnly(new[] { 0.50, 0.95, 0.99, 0.999, 1.0 });
@@ -66,7 +66,7 @@ public record MeasurementOptions
     ///     therefore means "statistically real <em>and</em> at least a small effect". Set the option
     ///     to <c>0</c> to restore p-value-only verdicts.
     /// </summary>
-    public const double DefaultMinimumPracticalEffect = 0.147;
+    internal const double DefaultMinimumPracticalEffect = 0.147;
 
     /// <summary>
     ///     The default <see cref="MinimumRelativeShift" />: 0.01 (1%). Conservative - it kills the
@@ -74,7 +74,7 @@ public record MeasurementOptions
     ///     rejects and Cliff's delta scores as a large effect) without being opinionated about what
     ///     a real effect size is. Set to <c>0</c> to restore practical-effect-only gating.
     /// </summary>
-    public const double DefaultMinimumRelativeShift = 0.01;
+    internal const double DefaultMinimumRelativeShift = 0.01;
     private readonly int? _opsPerSample;
     private readonly IReadOnlyList<double> _reportedPercentiles = DefaultReportedPercentiles;
     private readonly double _significanceLevel = 0.05;
@@ -314,7 +314,7 @@ public record MeasurementOptions
     ///     The largest value <see cref="MaxTransferredStateBytes" /> may be set to: 32 MiB, half the
     ///     protocol's 64 MiB frame ceiling.
     /// </summary>
-    public const int MaxTransferredStateCeiling = 32 * 1024 * 1024;
+    internal const int MaxTransferredStateCeiling = 32 * 1024 * 1024;
 
     private readonly int _maxTransferredStateBytes = DefaultMaxTransferredStateBytes;
 
