@@ -16,3 +16,4 @@ Technical reference for NBenchmark.
 - [Measurement Observer](./observers.md) - The live-telemetry callback surface for streaming measurement events.
 - [BCL Instrumentation](./bcl-instrumentation.md) - Built-in `System.Diagnostics` Meter/ActivitySource telemetry.
 - [Exceptions](./exceptions.md) - The exception types NBenchmark raises, and what each one means.
+- [Trimming and Native AOT](./aot.md) - What is supported when you publish with `PublishTrimmed` or `PublishAot`.

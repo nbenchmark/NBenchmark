@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -7,6 +8,8 @@ using NBenchmark.Engine;
 
 namespace NBenchmark.Discovery;
 
+[RequiresUnreferencedCode("Discovery enumerates an assembly's types and their attributed methods by reflection; a trimmed or AOT-compiled app keeps neither.")]
+[RequiresDynamicCode("Discovery enumerates an assembly's types and their attributed methods by reflection; a trimmed or AOT-compiled app keeps neither.")]
 internal sealed class BenchmarkDiscoverer
 {
     private readonly InstanceLifetime _defaultInstanceLifetime;

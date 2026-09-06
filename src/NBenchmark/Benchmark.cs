@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using NBenchmark.Engine;
 using NBenchmark.Workers;
 
@@ -38,6 +39,8 @@ namespace NBenchmark;
 ///         <see cref="Run{TState}(Func{TState}, Action{TState}, Action{TState}?, Action{TState}?, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />.
 ///     </para>
 /// </summary>
+[RequiresUnreferencedCode("A benchmark run reflects over the body's closure and its prepared state and moves both to the measuring process with the reflection-based JSON serializer, so trimming or AOT compiling the host can change or break what is measured.")]
+[RequiresDynamicCode("A benchmark run reflects over the body's closure and its prepared state and moves both to the measuring process with the reflection-based JSON serializer, so trimming or AOT compiling the host can change or break what is measured.")]
 public static class Benchmark
 {
     public static BenchmarkResult Run(Action action,

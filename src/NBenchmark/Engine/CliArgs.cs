@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
@@ -926,6 +927,7 @@ internal sealed record CliArgs
     ///     Parses <paramref name="args" /> and emits validation errors to stderr.
     ///     Sets <c>Environment.ExitCode = 1</c> when any errors are found.
     /// </summary>
+    [RequiresUnreferencedCode("Discovers the satellite packages' registrations by probing the entry assembly's references; trimming removes what the probe looks for.")]
     public static CliArgs Parse(string[] args)
     {
         var (cliArgs, errors) = ParseCore(args);
@@ -1093,6 +1095,7 @@ internal sealed record CliArgs
     ///     here - <c>--help advanced</c> prints those, because fifteen tuning knobs interleaved with
     ///     <c>--filter</c> is how a flat sixty-two-flag list stops being readable at all.
     /// </summary>
+    [RequiresUnreferencedCode("Discovers the satellite packages' registrations by probing the entry assembly's references; trimming removes what the probe looks for.")]
     private static IEnumerable<(string Group, HelpEntry[] Entries)> HelpGroups() =>
     [
         ("Selection",
@@ -1201,6 +1204,7 @@ internal sealed record CliArgs
     ///     Prints the help text for <paramref name="topic" />: the everyday flags by default, or the
     ///     advanced tuning group for <c>"advanced"</c>.
     /// </summary>
+    [RequiresUnreferencedCode("Discovers the satellite packages' registrations by probing the entry assembly's references; trimming removes what the probe looks for.")]
     internal static void PrintHelp(string? topic = null)
     {
         var advanced = string.Equals(topic, "advanced", StringComparison.OrdinalIgnoreCase);
@@ -1287,6 +1291,7 @@ internal sealed record CliArgs
             : Path.GetFileNameWithoutExtension(path);
     }
 
+    [RequiresUnreferencedCode("Discovers the satellite packages' registrations by probing the entry assembly's references; trimming removes what the probe looks for.")]
     private static string FormatAutoAttached()
     {
         var names = ReporterRegistry.AutoAttached;
@@ -1301,6 +1306,7 @@ internal sealed record CliArgs
     ///     The registered observers, or a pointer to the package that supplies one. The registry is
     ///     empty in a bare install, and a dangling colon reads as a bug rather than as "none yet".
     /// </summary>
+    [RequiresUnreferencedCode("Discovers the satellite packages' registrations by probing the entry assembly's references; trimming removes what the probe looks for.")]
     private static string FormatObservers()
     {
         var available = ObserverRegistry.Available;
@@ -1311,6 +1317,7 @@ internal sealed record CliArgs
         return $"{string.Join(", ", available.Select(r => r.Name))}{FormatAutoAttachedObservers()}";
     }
 
+    [RequiresUnreferencedCode("Discovers the satellite packages' registrations by probing the entry assembly's references; trimming removes what the probe looks for.")]
     private static string FormatAutoAttachedObservers()
     {
         var names = ObserverRegistry.AutoAttached;

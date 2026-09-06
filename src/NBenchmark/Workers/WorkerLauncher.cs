@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace NBenchmark.Workers;
 
 /// <summary>
@@ -40,6 +42,8 @@ internal interface IWorkerLauncher
         CancellationToken cancellationToken);
 }
 
+[RequiresUnreferencedCode("Runs a benchmark through the worker protocol, which reflects over the body's closure and prepared state and moves both with the reflection-based JSON serializer.")]
+[RequiresDynamicCode("Runs a benchmark through the worker protocol, which reflects over the body's closure and prepared state and moves both with the reflection-based JSON serializer.")]
 internal static class WorkerLauncher
 {
     /// <summary>
@@ -58,6 +62,8 @@ internal static class WorkerLauncher
     ///         is better hidden by pre-spawning than by recycling.
     ///     </para>
     /// </summary>
+    [RequiresUnreferencedCode("Runs a benchmark through the worker protocol, which reflects over the body's closure and prepared state and moves both with the reflection-based JSON serializer.")]
+    [RequiresDynamicCode("Runs a benchmark through the worker protocol, which reflects over the body's closure and prepared state and moves both with the reflection-based JSON serializer.")]
     private sealed class ProcessWorkerLauncher : IWorkerLauncher
     {
         public bool IsAvailable => WorkerLocator.WorkerAssemblyPath is not null;

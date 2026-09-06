@@ -41,6 +41,7 @@ public static class ObserverRegistry
 
     public static IReadOnlyList<ObserverInfo> Available
     {
+        [RequiresUnreferencedCode("Discovers the satellite packages' registrations by probing the entry assembly's references; trimming removes what the probe looks for.")]
         get
         {
             EnsureExtensionsLoaded();
@@ -64,6 +65,7 @@ public static class ObserverRegistry
     /// </summary>
     public static IReadOnlyList<ObserverInfo> AutoAttached
     {
+        [RequiresUnreferencedCode("Discovers the satellite packages' registrations by probing the entry assembly's references; trimming removes what the probe looks for.")]
         get
         {
             EnsureExtensionsLoaded();
@@ -135,6 +137,7 @@ public static class ObserverRegistry
     ///     <c>ResolveObserver</c> dedup ensures the observer does not fire twice when the
     ///     name is also auto-attached.
     /// </summary>
+    [RequiresUnreferencedCode("Discovers the satellite packages' registrations by probing the entry assembly's references; trimming removes what the probe looks for.")]
     public static bool TryCreate(string name, [NotNullWhen(true)] out IMeasurementObserver? observer)
     {
         ArgumentNullException.ThrowIfNull(name);
@@ -165,6 +168,7 @@ public static class ObserverRegistry
     ///     Used by <see cref="NBenchmark.Engine.CliArgs" /> validation to avoid calling the factory twice (once
     ///     for validation, once for construction in <see cref="BenchmarkHarness.Create" />).
     /// </summary>
+    [RequiresUnreferencedCode("Discovers the satellite packages' registrations by probing the entry assembly's references; trimming removes what the probe looks for.")]
     public static bool IsRegistered(string name)
     {
         ArgumentNullException.ThrowIfNull(name);
@@ -186,6 +190,7 @@ public static class ObserverRegistry
     ///     per-run for explicit observers. Observers whose factory throws are skipped and traced,
     ///     so a misbehaving auto-attached observer cannot kill the run.
     /// </summary>
+    [RequiresUnreferencedCode("Discovers the satellite packages' registrations by probing the entry assembly's references; trimming removes what the probe looks for.")]
     internal static IReadOnlyList<IMeasurementObserver> CreateAutoAttachedObservers(IReadOnlySet<string> explicitNames)
     {
         EnsureExtensionsLoaded();
@@ -229,6 +234,7 @@ public static class ObserverRegistry
         return observers;
     }
 
+    [RequiresUnreferencedCode("Probes the entry assembly's references to auto-load the satellite packages' extensions; trimming removes the references it looks for.")]
     private static void EnsureExtensionsLoaded()
     {
         if (Interlocked.Exchange(ref _extensionsLoaded, 1) != 0)

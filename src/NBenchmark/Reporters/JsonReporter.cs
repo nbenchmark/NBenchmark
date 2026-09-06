@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace NBenchmark.Reporters;
 
+[RequiresUnreferencedCode("Writes the report with the reflection-based JSON serializer.")]
+[RequiresDynamicCode("Writes the report with the reflection-based JSON serializer.")]
 public sealed class JsonReporter(string? outputDirectory = null, string? fileName = null) : IReporter
 {
     private static readonly JsonSerializerOptions Options = new()

@@ -19,6 +19,16 @@ public sealed record ReporterInfo(string Name, string Description);
 /// </remarks>
 public static class ReporterRegistry
 {
+    // The JSON reporter is the only seeded reporter that needs the reflection-based serializer, and
+    // its factory is a delegate: an attribute cannot travel with a lambda, so the requirement is
+    // declared where the delegate is *invoked* instead. Every path that invokes one of these
+    // factories - TryCreate and CreateAutoAttachedReporters - carries RequiresUnreferencedCode, so a
+    // caller is still told before a reporter is ever constructed. Building the table itself
+    // constructs nothing.
+    [UnconditionalSuppressMessage("Trimming", "IL2026",
+        Justification = "The factory is only invoked through members that declare the requirement themselves.")]
+    [UnconditionalSuppressMessage("AOT", "IL3050",
+        Justification = "The factory is only invoked through members that declare the requirement themselves.")]
     private static readonly Entry[] _seed =
     [
         new("json", "JSON file output (one file per run)", dir => new JsonReporter(dir)),
@@ -44,6 +54,7 @@ public static class ReporterRegistry
 
     public static IReadOnlyList<ReporterInfo> Available
     {
+        [RequiresUnreferencedCode("Discovers the satellite packages' registrations by probing the entry assembly's references; trimming removes what the probe looks for.")]
         get
         {
             EnsureExtensionsLoaded();
@@ -66,6 +77,7 @@ public static class ReporterRegistry
     /// </summary>
     public static IReadOnlyList<ReporterInfo> AutoAttached
     {
+        [RequiresUnreferencedCode("Discovers the satellite packages' registrations by probing the entry assembly's references; trimming removes what the probe looks for.")]
         get
         {
             EnsureExtensionsLoaded();
@@ -126,6 +138,7 @@ public static class ReporterRegistry
     ///     counterpart of <see cref="NBenchmark.Observers.ObserverRegistry.IsRegistered" />, and used the same way, to
     ///     validate <c>--reporter</c> without running a factory twice.
     /// </summary>
+    [RequiresUnreferencedCode("Discovers the satellite packages' registrations by probing the entry assembly's references; trimming removes what the probe looks for.")]
     public static bool IsRegistered(string name)
     {
         ArgumentNullException.ThrowIfNull(name);
@@ -145,6 +158,7 @@ public static class ReporterRegistry
     ///     auto-attached reporter the same way <c>--observer &lt;name&gt;</c> does on the observer
     ///     side. The dedup in <see cref="InvokeReportersAsync" /> keeps it from firing twice.
     /// </summary>
+    [RequiresUnreferencedCode("Discovers the satellite packages' registrations by probing the entry assembly's references; trimming removes what the probe looks for.")]
     public static bool TryCreate(string name, string? outputDir, [NotNullWhen(true)] out IReporter? reporter)
     {
         ArgumentNullException.ThrowIfNull(name);
@@ -176,6 +190,7 @@ public static class ReporterRegistry
     ///     each run gets fresh instances, mirroring how <see cref="TryCreate" /> is called per-run for
     ///     explicit reporters.
     /// </summary>
+    [RequiresUnreferencedCode("Discovers the satellite packages' registrations by probing the entry assembly's references; trimming removes what the probe looks for.")]
     internal static IReadOnlyList<IReporter> CreateAutoAttachedReporters(IReadOnlySet<string> explicitNames)
     {
         EnsureExtensionsLoaded();
@@ -218,6 +233,7 @@ public static class ReporterRegistry
     ///     a misbehaving reporter cannot kill the run. Called once per <c>RunAsync</c> by both
     ///     <c>BenchmarkHarness</c> and <c>BenchmarkSuite</c>.
     /// </summary>
+    [RequiresUnreferencedCode("Discovers the satellite packages' registrations by probing the entry assembly's references; trimming removes what the probe looks for.")]
     internal static async Task InvokeReportersAsync(
         IReadOnlyList<IReporter> explicitReporters,
         ReportContext context,
@@ -251,6 +267,7 @@ public static class ReporterRegistry
         }
     }
 
+    [RequiresUnreferencedCode("Probes the entry assembly's references to auto-load the satellite packages' extensions; trimming removes the references it looks for.")]
     private static void EnsureExtensionsLoaded()
     {
         if (Interlocked.Exchange(ref _extensionsLoaded, 1) != 0)

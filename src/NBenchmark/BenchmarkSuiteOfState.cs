@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics;
 using NBenchmark.Engine;
 using NBenchmark.Reporters;
@@ -24,6 +25,8 @@ namespace NBenchmark;
 ///     </para>
 /// </remarks>
 /// <typeparam name="TState">The prepared value each benchmark body receives.</typeparam>
+[RequiresUnreferencedCode("A benchmark run reflects over the body's closure and its prepared state and moves both to the measuring process with the reflection-based JSON serializer, so trimming or AOT compiling the host can change or break what is measured.")]
+[RequiresDynamicCode("A benchmark run reflects over the body's closure and its prepared state and moves both to the measuring process with the reflection-based JSON serializer, so trimming or AOT compiling the host can change or break what is measured.")]
 public sealed class BenchmarkSuite<TState> : BenchmarkSuite
 {
     private readonly Func<TState> _prepare;

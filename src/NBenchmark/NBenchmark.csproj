@@ -19,6 +19,24 @@
       Interop/ uses it.
     -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!--
+      Trim and AOT analysis, on permanently. NBenchmark cannot be trim- or AOT-clean - discovery,
+      argument binding and the whole worker protocol are reflective by design - and a consumer who
+      set PublishAot=true or PublishTrimmed=true used to get no signal at all about which of those
+      would still work. Every reflective member now carries RequiresUnreferencedCode /
+      RequiresDynamicCode naming the feature that needs it, so the consumer is told at the call
+      site, and the analyzers stay on so a new reflective path is a build break here rather than a
+      silent behaviour change in somebody's published app.
+
+      IsTrimmable is the other half: it marks the assembly as safe for the trimmer to reduce, which
+      is only true because those annotations exist. The single-file analyzer is deliberately not
+      enabled - Assembly.Location is read to locate the worker, which is a separate question from
+      trimming and one the worker architecture answers differently.
+    -->
+    <IsTrimmable>true</IsTrimmable>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
   </PropertyGroup>
 
   <ItemGroup>
@@ -71,6 +89,51 @@
     <!-- Imported automatically by any project that references the package. -->
     <None Include="build/NBenchmark.targets" Pack="true" PackagePath="build/"/>
   </ItemGroup>
+
+  <!--
+    The analyzers and their code fixes ship inside this package rather than as a separate opt-in
+    NBenchmark.Analyzers package, because a diagnostic nobody installed is a diagnostic nobody
+    gets. NB0014 (capturing body), NB0004 (no observable side effect), NB0005 (no-work body) and
+    NB0010 (throwaway body) catch exactly the mistakes that produce a confident, wrong number, and
+    the author most likely to write a capturing body was the one least likely to have gone looking
+    for an optional analyzer package.
+
+    ReferenceOutputAssembly is false because nothing here compiles against Roslyn: the reference
+    exists to order the build and to make the assemblies exist by pack time. PrivateAssets keeps
+    both projects out of the consumer's dependency graph - they arrive as analyzer content, not as
+    a package dependency.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="../NBenchmark.Analyzers/NBenchmark.Analyzers.csproj"
+                      PrivateAssets="all" ReferenceOutputAssembly="false"/>
+    <ProjectReference Include="../NBenchmark.CodeFixes/NBenchmark.CodeFixes.csproj"
+                      PrivateAssets="all" ReferenceOutputAssembly="false"/>
+
+    <!--
+      Declared as None rather than through TargetsForTfmSpecificContentInPackage (which the worker
+      uses) because these are the same two target-framework-independent assemblies for every TFM
+      this package builds: collected once in the outer build, they land in analyzers/dotnet/cs
+      once, instead of three times over with the same package path.
+    -->
+    <None Include="../NBenchmark.Analyzers/bin/$(Configuration)/netstandard2.0/NBenchmark.Analyzers.dll"
+          Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
+    <None Include="../NBenchmark.CodeFixes/bin/$(Configuration)/netstandard2.0/NBenchmark.CodeFixes.dll"
+          Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
+  </ItemGroup>
+
+  <!--
+    A None item pointing at a file that does not exist is silently dropped by pack, so without this
+    the failure mode is a package that restores, builds and reports nothing - the same silence the
+    optional package produced, now impossible to notice. Checked in the outer build, before the
+    nuspec is generated.
+  -->
+  <Target Name="_NBenchmarkVerifyAnalyzers" BeforeTargets="GenerateNuspec">
+    <Error Condition="!Exists('$(MSBuildThisFileDirectory)../NBenchmark.Analyzers/bin/$(Configuration)/netstandard2.0/NBenchmark.Analyzers.dll')"
+           Text="NBenchmark.Analyzers.dll was not built for $(Configuration). Packing without it would ship a package whose benchmark-authoring diagnostics silently never run."/>
+
+    <Error Condition="!Exists('$(MSBuildThisFileDirectory)../NBenchmark.CodeFixes/bin/$(Configuration)/netstandard2.0/NBenchmark.CodeFixes.dll')"
+           Text="NBenchmark.CodeFixes.dll was not built for $(Configuration). Packing without it would ship diagnostics with no code fixes attached."/>
+  </Target>
 
   <!--
     Packs the measurement worker under tools/<tfm>/, so its version can never skew from the engine's

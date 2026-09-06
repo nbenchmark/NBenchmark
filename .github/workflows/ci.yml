@@ -47,3 +47,109 @@ jobs:
 
       - name: Run tests
         run: dotnet test --no-build --configuration Release --verbosity normal
+
+  samples:
+    # Every sample, built and *run*. Building them is already covered by the job above - they are in
+    # the solution - so what this adds is that they still work: a sample is the shortest path from
+    # the README to a wrong impression, and one that throws on startup after an API change looks
+    # exactly like one that does not until something executes it. `samples/CrossClassSignificance`
+    # spent an epoch outside the solution for want of a step like this.
+    #
+    # Ubuntu only, and after the build job. The samples measure real code, so the wall-clock cost is
+    # the point of the exercise rather than something to pay three times over; the
+    # platform-conditional code they would exercise is already covered by the matrix above.
+    name: Run Samples
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Build samples
+        run: dotnet build --configuration Release
+
+      - name: Run every sample
+        run: |
+          set -euo pipefail
+          failed=()
+          for project in samples/*/*.csproj; do
+            name=$(basename "$(dirname "$project")")
+
+            # A multi-targeted sample - the multi-runtime ones, and Telemetry - refuses to run
+            # without a framework, so pick the newest it builds for. The point of those samples is
+            # what they measure across runtimes, which they do by launching the others themselves.
+            framework=()
+            if grep -q "<TargetFrameworks>" "$project"; then
+              framework=(--framework net10.0)
+            fi
+
+            echo "::group::$name"
+            # A stuck-sample guard, not a budget. The slowest sample is a multi-runtime one, which
+            # builds and launches a worker per runtime before it measures anything and still lands
+            # under a minute; the whole set runs in about six.
+            if timeout 900 dotnet run --project "$project" "${framework[@]}" --configuration Release --no-build; then
+              echo "$name ok"
+            else
+              echo "$name FAILED with exit code $?"
+              failed+=("$name")
+            fi
+            echo "::endgroup::"
+          done
+          if [ ${#failed[@]} -ne 0 ]; then
+            echo "Samples that did not complete: ${failed[*]}"
+            exit 1
+          fi
+
+  aot-probe:
+    # What a consumer gets when they publish NBenchmark with Native AOT, checked in as a fact rather
+    # than guessed at. The publish is the first half - every reflective member is declared, so an
+    # undeclared trim or AOT hazard fails it - and running the binary is the half that matters: an
+    # AOT compilation that succeeds and then throws at the first MakeGenericMethod is
+    # indistinguishable from success until something executes it.
+    #
+    # See tests/NBenchmark.AotProbe/Program.cs for what the exit code means. It is currently a
+    # refusal, deliberately: single mode is not AOT-viable yet, and this is where that stops being
+    # folklore.
+    name: Native AOT Probe
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Install the native toolchain
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+
+      - name: Publish the probe with Native AOT
+        run: dotnet publish tests/NBenchmark.AotProbe --configuration Release --output ./artifacts/aot
+
+      - name: Run the published binary
+        env:
+          # The probe asks for Isolation.Off, so the "no worker deployed" notice is expected and
+          # says nothing about the AOT question being asked.
+          NBENCHMARK_SUPPRESS_ISOLATION_WARNING: "1"
+        run: ./artifacts/aot/NBenchmark.AotProbe

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -28,6 +29,8 @@ namespace NBenchmark.Workers;
 ///         the two agree.
 ///     </para>
 /// </remarks>
+[RequiresUnreferencedCode("Constructs converters over the collection types found at run time and serializes their elements reflectively.")]
+[RequiresDynamicCode("Constructs converters over the collection types found at run time and serializes their elements reflectively.")]
 internal static class OrderedCollectionConverters
 {
     public static void Register(JsonSerializerOptions options)
@@ -37,6 +40,8 @@ internal static class OrderedCollectionConverters
         options.Converters.Add(new StackConverterFactory());
     }
 
+    [RequiresUnreferencedCode("Constructs converters over the collection types found at run time and serializes their elements reflectively.")]
+    [RequiresDynamicCode("Constructs converters over the collection types found at run time and serializes their elements reflectively.")]
     private sealed class ReadOnlyCollectionConverterFactory : JsonConverterFactory
     {
         public override bool CanConvert(Type typeToConvert)
@@ -47,6 +52,8 @@ internal static class OrderedCollectionConverters
                 typeof(ReadOnlyCollectionConverter<>).MakeGenericType(typeToConvert.GetGenericArguments()))!;
     }
 
+    [RequiresUnreferencedCode("Constructs converters over the collection types found at run time and serializes their elements reflectively.")]
+    [RequiresDynamicCode("Constructs converters over the collection types found at run time and serializes their elements reflectively.")]
     private sealed class ReadOnlyCollectionConverter<T> : JsonConverter<ReadOnlyCollection<T>>
     {
         public override ReadOnlyCollection<T> Read(
@@ -57,6 +64,8 @@ internal static class OrderedCollectionConverters
             => WriteElements(writer, value, options);
     }
 
+    [RequiresUnreferencedCode("Constructs converters over the collection types found at run time and serializes their elements reflectively.")]
+    [RequiresDynamicCode("Constructs converters over the collection types found at run time and serializes their elements reflectively.")]
     private sealed class ArraySegmentConverterFactory : JsonConverterFactory
     {
         public override bool CanConvert(Type typeToConvert)
@@ -67,6 +76,8 @@ internal static class OrderedCollectionConverters
                 typeof(ArraySegmentConverter<>).MakeGenericType(typeToConvert.GetGenericArguments()))!;
     }
 
+    [RequiresUnreferencedCode("Constructs converters over the collection types found at run time and serializes their elements reflectively.")]
+    [RequiresDynamicCode("Constructs converters over the collection types found at run time and serializes their elements reflectively.")]
     private sealed class ArraySegmentConverter<T> : JsonConverter<ArraySegment<T>>
     {
         public override ArraySegment<T> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -76,6 +87,8 @@ internal static class OrderedCollectionConverters
             => WriteElements(writer, value, options);
     }
 
+    [RequiresUnreferencedCode("Constructs converters over the collection types found at run time and serializes their elements reflectively.")]
+    [RequiresDynamicCode("Constructs converters over the collection types found at run time and serializes their elements reflectively.")]
     private sealed class StackConverterFactory : JsonConverterFactory
     {
         public override bool CanConvert(Type typeToConvert)
@@ -86,6 +99,8 @@ internal static class OrderedCollectionConverters
                 typeof(StackConverter<>).MakeGenericType(typeToConvert.GetGenericArguments()))!;
     }
 
+    [RequiresUnreferencedCode("Constructs converters over the collection types found at run time and serializes their elements reflectively.")]
+    [RequiresDynamicCode("Constructs converters over the collection types found at run time and serializes their elements reflectively.")]
     private sealed class StackConverter<T> : JsonConverter<Stack<T>>
     {
         public override Stack<T> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -104,6 +119,8 @@ internal static class OrderedCollectionConverters
             => WriteElements(writer, value, options);
     }
 
+    [RequiresUnreferencedCode("Constructs converters over the collection types found at run time and serializes their elements reflectively.")]
+    [RequiresDynamicCode("Constructs converters over the collection types found at run time and serializes their elements reflectively.")]
     private static List<T> ReadElements<T>(ref Utf8JsonReader reader, JsonSerializerOptions options)
     {
         if (reader.TokenType != JsonTokenType.StartArray)
@@ -117,6 +134,8 @@ internal static class OrderedCollectionConverters
         return items;
     }
 
+    [RequiresUnreferencedCode("Constructs converters over the collection types found at run time and serializes their elements reflectively.")]
+    [RequiresDynamicCode("Constructs converters over the collection types found at run time and serializes their elements reflectively.")]
     private static void WriteElements<T>(Utf8JsonWriter writer, IEnumerable<T> items, JsonSerializerOptions options)
     {
         writer.WriteStartArray();

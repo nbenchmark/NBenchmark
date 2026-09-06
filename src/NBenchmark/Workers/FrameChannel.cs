@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -14,6 +15,8 @@ namespace NBenchmark.Workers;
 ///         property while gaining a live channel.
 ///     </para>
 /// </summary>
+[RequiresUnreferencedCode("Serializes the worker protocol with the reflection-based JSON serializer.")]
+[RequiresDynamicCode("Serializes the worker protocol with the reflection-based JSON serializer.")]
 internal sealed class FrameChannel : IDisposable
 {
     /// <summary>

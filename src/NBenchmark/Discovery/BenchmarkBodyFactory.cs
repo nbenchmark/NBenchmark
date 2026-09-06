@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
 
@@ -33,6 +34,8 @@ namespace NBenchmark.Discovery;
 ///         the per-operation cost is still a single delegate invocation.
 ///     </para>
 /// </remarks>
+[RequiresUnreferencedCode("Builds a benchmark body by constructing generic types and compiling an expression tree over the discovered method.")]
+[RequiresDynamicCode("Builds a benchmark body by constructing generic types and compiling an expression tree over the discovered method.")]
 internal static class BenchmarkBodyFactory
 {
     /// <summary>

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using NBenchmark.Engine;
 
@@ -19,6 +20,8 @@ namespace NBenchmark.Workers;
 ///         per-operation allocation they never wrote.
 ///     </para>
 /// </summary>
+[RequiresUnreferencedCode("Invokes a benchmark body through a generic method instantiated over the body's run-time signature.")]
+[RequiresDynamicCode("Invokes a benchmark body through a generic method instantiated over the body's run-time signature.")]
 internal static class DelegateDispatch
 {
     private static readonly MethodInfo RunGeneric = typeof(BenchmarkRunner)

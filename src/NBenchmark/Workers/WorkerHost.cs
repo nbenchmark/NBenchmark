@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
@@ -11,6 +12,8 @@ namespace NBenchmark.Workers;
 ///     A live measurement worker, from the coordinator's side: the child process, its duplex pipe,
 ///     and what it reported about itself.
 /// </summary>
+[RequiresUnreferencedCode("Runs a benchmark through the worker protocol, which reflects over the body's closure and prepared state and moves both with the reflection-based JSON serializer.")]
+[RequiresDynamicCode("Runs a benchmark through the worker protocol, which reflects over the body's closure and prepared state and moves both with the reflection-based JSON serializer.")]
 internal sealed class WorkerHost : IAsyncDisposable
 {
     /// <summary>

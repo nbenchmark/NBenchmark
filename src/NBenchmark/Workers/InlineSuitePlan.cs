@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics;
 using NBenchmark.Engine;
 
@@ -23,6 +24,8 @@ namespace NBenchmark.Workers;
 ///         imposed on everyone up front.
 ///     </para>
 /// </remarks>
+[RequiresUnreferencedCode("Runs a benchmark through the worker protocol, which reflects over the body's closure and prepared state and moves both with the reflection-based JSON serializer.")]
+[RequiresDynamicCode("Runs a benchmark through the worker protocol, which reflects over the body's closure and prepared state and moves both with the reflection-based JSON serializer.")]
 internal static class InlineSuitePlan
 {
     /// <summary>What stops an inline suite from being measured in a worker.</summary>

@@ -29,7 +29,7 @@ public sealed class PerClassWithScopedServiceCodeFixProvider : CodeFixProvider
     private const string IStateResetMetadataName = "NBenchmark.Lifecycle.IStateReset";
 
     public override ImmutableArray<string> FixableDiagnosticIds =>
-        [DiagnosticIds.PerClassWithScopedService];
+        ImmutableArray.Create(DiagnosticIds.PerClassWithScopedService);
 
     public override FixAllProvider GetFixAllProvider() =>
         WellKnownFixAllProviders.BatchFixer;

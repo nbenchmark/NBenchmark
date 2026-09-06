@@ -6,17 +6,19 @@ order: 2
 
 # Analyzers
 
-`NBenchmark.Analyzers` provides a set of Roslyn diagnostic analyzers that detect configuration issues at edit time. Install the package to get live warnings and errors in your IDE and during `dotnet build`.
+NBenchmark ships a set of Roslyn diagnostic analyzers that detect configuration issues at edit time. You get live warnings and errors in your IDE and during `dotnet build`.
 
 ## Setup
 
-Add the analyzers package to your project:
+There is none. The analyzers and their code fixes arrive inside the `NBenchmark` package and run without configuration:
 
 ```bash
-dotnet add package NBenchmark.Analyzers
+dotnet add package NBenchmark
 ```
 
-The analyzers run automatically without additional configuration. The package includes both analyzers (diagnostics) and code fixes (automatic corrections).
+They ship this way on purpose. The mistakes these rules catch - a capturing body, a body with no observable side effect, a body the JIT can delete - all produce a number that looks perfectly reasonable, so an author who makes one has no reason to suspect anything is wrong. An analyzer nobody installed would never have told them.
+
+If you used the separate `NBenchmark.Analyzers` package, remove the `PackageReference`. The rule IDs, severities, and code fixes are unchanged.
 
 ## Diagnostic reference
 

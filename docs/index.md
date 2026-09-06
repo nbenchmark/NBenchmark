@@ -121,14 +121,14 @@ NBenchmark doesn't use a simple average of a fixed loop.
 
 | Package | Purpose |
 | --- | --- |
-| `NBenchmark` | Core engine and statistics |
-| `NBenchmark.Analyzers` | Compile-time checks for benchmark correctness |
+| `NBenchmark` | Core engine, statistics, and the compile-time checks for benchmark correctness |
 | `NBenchmark.DependencyInjection` | Constructor injection for benchmark classes |
-| `NBenchmark.Tool` | .NET global tool to run benchmarks from the CLI |
 | `NBenchmark.Reporters.Console` | Terminal tables via Spectre.Console |
+| `NBenchmark.Exporters.OpenTelemetry` | Per-sample telemetry over OTLP |
 | `NBenchmark.Integration.xUnit` | xUnit performance assertions |
 | `NBenchmark.Integration.NUnit` | NUnit performance assertions |
 | `NBenchmark.Integration.MSTest` | MSTest performance assertions |
+| `NBenchmark.Tool` | .NET global tool to run benchmarks from the CLI |
 
 ## Next steps
 

@@ -1,4 +1,5 @@
 using NBenchmark.Reporters;
+using System.Diagnostics.CodeAnalysis;
 
 namespace NBenchmark;
 
@@ -134,6 +135,8 @@ public static class BenchmarkResultExtensions
     }
 
     /// <inheritdoc cref="SaveMarkdownAsync" />
+    [RequiresUnreferencedCode("Writes the report with the reflection-based JSON serializer.")]
+    [RequiresDynamicCode("Writes the report with the reflection-based JSON serializer.")]
     public static async Task<string> SaveJsonAsync(
         this BenchmarkResult result, string outputDir = ".", string? fileName = null)
     {

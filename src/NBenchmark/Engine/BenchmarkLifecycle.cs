@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using NBenchmark.Discovery;
 
 namespace NBenchmark.Engine;
@@ -15,7 +16,9 @@ internal static class BenchmarkLifecycle
     ///     absent entirely from every file reporter, which is where a CI reader looks.
     /// </param>
     public static (object Instance, Action InstanceTeardown)? CreateInstance(
-        Type type, Func<Type, InstanceHandle>? instanceFactory, out string? failure)
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] Type type,
+        Func<Type, InstanceHandle>? instanceFactory,
+        out string? failure)
     {
         failure = null;
 
@@ -54,6 +57,8 @@ internal static class BenchmarkLifecycle
         }
     }
 
+    [RequiresUnreferencedCode("Harness mode discovers [Benchmark] methods by reflecting over the assembly's types, and the run itself reflects over the discovered members; a trimmed or AOT-compiled app keeps neither.")]
+    [RequiresDynamicCode("Harness mode discovers [Benchmark] methods by reflecting over the assembly's types, and the run itself reflects over the discovered members; a trimmed or AOT-compiled app keeps neither.")]
     public static (bool Success, IReadOnlyList<BenchmarkResult>? ErroredResults) TryRunSetup(
         BenchmarkSuiteDefinition suite, object instance, MeasurementOptions suiteOptions)
     {

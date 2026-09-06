@@ -14,7 +14,7 @@ namespace NBenchmark.CodeFixes.CodeFixes;
 public sealed class RemoveStaticKeywordCodeFixProvider : CodeFixProvider
 {
     public override ImmutableArray<string> FixableDiagnosticIds =>
-        [DiagnosticIds.StaticBenchmarkMethod];
+        ImmutableArray.Create(DiagnosticIds.StaticBenchmarkMethod);
 
     public override FixAllProvider GetFixAllProvider() =>
         WellKnownFixAllProviders.BatchFixer;

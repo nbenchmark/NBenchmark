@@ -27,7 +27,7 @@ public sealed class PureBodyAnalyzer : DiagnosticAnalyzer
         true);
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-        [NoWorkRule, NoSideEffectRule];
+        ImmutableArray.Create(NoWorkRule, NoSideEffectRule);
 
     public override void Initialize(AnalysisContext context)
     {

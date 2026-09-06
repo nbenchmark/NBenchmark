@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using NBenchmark.Engine;
 
@@ -12,6 +13,8 @@ namespace NBenchmark.Workers;
 ///     protocol is internal to the core - the integrations should be able to ask for an isolated
 ///     measurement without being able to hand-assemble a wire request.
 /// </remarks>
+[RequiresUnreferencedCode("Runs a benchmark through the worker protocol, which reflects over the body's closure and prepared state and moves both with the reflection-based JSON serializer.")]
+[RequiresDynamicCode("Runs a benchmark through the worker protocol, which reflects over the body's closure and prepared state and moves both with the reflection-based JSON serializer.")]
 internal static class TestMethodRunner
 {
     /// <summary>One method to measure, and the name to report it under.</summary>

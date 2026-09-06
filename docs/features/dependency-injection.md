@@ -206,7 +206,7 @@ await new BenchmarkSuite("repo")
 This error occurs when `Activator.CreateInstance` cannot construct your benchmark class. Use one of these remedies:
 
 1. **Add a parameterless constructor** to the benchmark class if it has no real dependencies.
-2. **Install `NBenchmark.Analyzers`** to detect this at compile time (NB0001).
+2. **Look for NB0001 in your build output.** The analyzer ships with `NBenchmark` and reports this at compile time.
 3. **Use `WithServices` or `WithInstanceFactory`** on `BenchmarkHarness` to resolve instances from your DI container. Wrap your container build logic in a static factory:
 
    ```csharp

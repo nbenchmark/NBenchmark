@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
 namespace NBenchmark.Workers;
@@ -24,6 +25,8 @@ namespace NBenchmark.Workers;
 ///         never wrote.
 ///     </para>
 /// </remarks>
+[RequiresUnreferencedCode("Binds [BenchmarkCase] arguments by constructing generic types and methods from the parameter types found at run time.")]
+[RequiresDynamicCode("Binds [BenchmarkCase] arguments by constructing generic types and methods from the parameter types found at run time.")]
 internal static class ArgumentBinder
 {
     /// <summary>

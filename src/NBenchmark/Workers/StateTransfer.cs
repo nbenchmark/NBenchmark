@@ -2,6 +2,7 @@ using System.Buffers.Text;
 using System.Collections;
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using NBenchmark;
 using System.Runtime.CompilerServices;
@@ -201,6 +202,8 @@ internal sealed record TransferredReceiver
 ///         writes exactly as they did before this table existed. Aliasing is a fact about the group.
 ///     </para>
 /// </remarks>
+[RequiresUnreferencedCode("Runs a benchmark through the worker protocol, which reflects over the body's closure and prepared state and moves both with the reflection-based JSON serializer.")]
+[RequiresDynamicCode("Runs a benchmark through the worker protocol, which reflects over the body's closure and prepared state and moves both with the reflection-based JSON serializer.")]
 internal sealed class ReceiverTable(int budgetBytes)
 {
     private Dictionary<object, int> _indices = new(ReferenceEqualityComparer.Instance);
@@ -348,6 +351,8 @@ internal sealed class GroupIdentitySet
 ///         author asserting exactly that claim about their own type. Nothing infers it.
 ///     </para>
 /// </remarks>
+[RequiresUnreferencedCode("Walks prepared state reflectively and serializes it to the worker with the reflection-based JSON serializer.")]
+[RequiresDynamicCode("Walks prepared state reflectively and serializes it to the worker with the reflection-based JSON serializer.")]
 internal static class StateTransfer
 {
     /// <summary>
@@ -1229,6 +1234,8 @@ internal static class StateTransfer
     ///     Bounds the value walk, so a deep or enormous opted-in graph refuses rather than running out
     ///     of stack or spending measurable time in the coordinator.
     /// </summary>
+    [RequiresUnreferencedCode("Walks prepared state reflectively and serializes it to the worker with the reflection-based JSON serializer.")]
+    [RequiresDynamicCode("Walks prepared state reflectively and serializes it to the worker with the reflection-based JSON serializer.")]
     private sealed class FaithfulnessWalk
     {
         /// <summary>Nesting of opted-in types, which - unlike a display class chain - is unbounded.</summary>

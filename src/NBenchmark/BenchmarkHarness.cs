@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics;
 using System.Reflection;
 using NBenchmark.Diagnostics;
@@ -11,6 +12,8 @@ using NBenchmark.Workers;
 
 namespace NBenchmark;
 
+[RequiresUnreferencedCode("Harness mode discovers [Benchmark] methods by reflecting over the assembly's types, and the run itself reflects over the discovered members; a trimmed or AOT-compiled app keeps neither.")]
+[RequiresDynamicCode("Harness mode discovers [Benchmark] methods by reflecting over the assembly's types, and the run itself reflects over the discovered members; a trimmed or AOT-compiled app keeps neither.")]
 public sealed class BenchmarkHarness
 {
     private readonly List<Assembly> _assemblies = [];

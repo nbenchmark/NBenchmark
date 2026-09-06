@@ -37,12 +37,13 @@ dotnet add package NBenchmark
 
 | Package | Purpose |
 | --- | --- |
-| `NBenchmark.Analyzers` | Roslyn analyzers that catch authoring mistakes at build time |
 | `NBenchmark.DependencyInjection` | Constructor injection for benchmark classes |
 | `NBenchmark.Reporters.Console` | Rich terminal tables via Spectre.Console |
+| `NBenchmark.Exporters.OpenTelemetry` | Stream per-sample telemetry over OTLP |
 | `NBenchmark.Integration.xUnit` | Enforce performance thresholds as xUnit tests |
 | `NBenchmark.Integration.NUnit` | Enforce performance thresholds as NUnit tests |
 | `NBenchmark.Integration.MSTest` | Enforce performance thresholds as MSTest tests |
+| `NBenchmark.Tool` | `dotnet benchmark`, for running benchmarks in any assembly |
 
 ## Four modes, one engine
 

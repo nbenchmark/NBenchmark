@@ -1,4 +1,5 @@
 using NBenchmark.Engine;
+using System.Diagnostics.CodeAnalysis;
 
 namespace NBenchmark.Workers;
 
@@ -65,6 +66,8 @@ internal enum InstanceSourceKind
 ///         nothing.
 ///     </para>
 /// </remarks>
+[RequiresUnreferencedCode("Runs a benchmark through the worker protocol, which reflects over the body's closure and prepared state and moves both with the reflection-based JSON serializer.")]
+[RequiresDynamicCode("Runs a benchmark through the worker protocol, which reflects over the body's closure and prepared state and moves both with the reflection-based JSON serializer.")]
 internal sealed record InstanceSource
 {
     public required InstanceSourceKind Kind { get; init; }

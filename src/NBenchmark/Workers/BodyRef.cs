@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
@@ -82,6 +83,8 @@ internal enum BodyShape
 ///         divergence between what was measured and what was written.
 ///     </para>
 /// </summary>
+[RequiresUnreferencedCode("Reconstructs a benchmark body in the worker from the closure fields the host reflected over.")]
+[RequiresDynamicCode("Reconstructs a benchmark body in the worker from the closure fields the host reflected over.")]
 internal sealed record BodyRef
 {
     public required string DisplayName { get; init; }

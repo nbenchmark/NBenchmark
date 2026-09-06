@@ -95,7 +95,7 @@ public sealed class CapturingBodyAnalyzer : DiagnosticAnalyzer
         + "capture rather than predicting the outcome; the result's own IsolationStatus is "
         + "authoritative.");
 
-    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [Rule];
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
 
     public override void Initialize(AnalysisContext context)
     {

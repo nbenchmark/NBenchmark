@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using NBenchmark.Diagnostics;
@@ -15,6 +16,8 @@ namespace NBenchmark;
 ///     an extension point - a third subclass would inherit behaviour no part of the engine expects to
 ///     vary.
 /// </remarks>
+[RequiresUnreferencedCode("A benchmark run reflects over the body's closure and its prepared state and moves both to the measuring process with the reflection-based JSON serializer, so trimming or AOT compiling the host can change or break what is measured.")]
+[RequiresDynamicCode("A benchmark run reflects over the body's closure and its prepared state and moves both to the measuring process with the reflection-based JSON serializer, so trimming or AOT compiling the host can change or break what is measured.")]
 public class BenchmarkSuite(string name)
 {
     private readonly List<BenchmarkEnvelope> _benchmarks = [];

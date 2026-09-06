@@ -16,21 +16,13 @@ NBenchmark provides several NuGet packages. Install only the packages you need f
 
 ### Core package
 
-The core package includes all measurement and statistics features, as well as file-based reporters for JSON, Markdown, and CSV. This package has no NuGet dependencies and relies only on the .NET Base Class Library (BCL).
+The core package includes all measurement and statistics features, the file-based reporters for JSON, Markdown, and CSV, and the build-time analyzers. This package has no NuGet dependencies and relies only on the .NET Base Class Library (BCL).
 
 ```bash
 dotnet add package NBenchmark
 ```
 
-### Analyzers package (recommended)
-
-The analyzers package provides compile-time diagnostics to catch common NBenchmark configuration errors, such as missing parameterless constructors or static benchmark methods.
-
-```bash
-dotnet add package NBenchmark.Analyzers
-```
-
-The analyzers run automatically in your IDE and during `dotnet build`. For a complete list of diagnostics, see the [Analyzers](../reference/analyzers.md) page.
+The analyzers arrive with it - there is no separate package to install. They run in your IDE and during `dotnet build`, and catch the authoring mistakes that produce a confident, wrong number: a capturing body, a body with no observable side effect, a static benchmark method, a class with no parameterless constructor. For the complete list, see [Analyzers](../reference/analyzers.md).
 
 ## Verify your installation
 

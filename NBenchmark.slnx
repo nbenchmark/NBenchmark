@@ -1,0 +1,62 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/Analyzers/">
+    <Project Path="src/NBenchmark.Analyzers/NBenchmark.Analyzers.csproj" />
+    <Project Path="src/NBenchmark.CodeFixes/NBenchmark.CodeFixes.csproj" />
+  </Folder>
+  <Folder Name="/Exporters/">
+    <Project Path="src/NBenchmark.Exporters.OpenTelemetry/NBenchmark.Exporters.OpenTelemetry.csproj" />
+  </Folder>
+  <Folder Name="/Integration/">
+    <Project Path="src/NBenchmark.Integration.Abstractions/NBenchmark.Integration.Abstractions.csproj" />
+    <Project Path="src/NBenchmark.Integration.MSTest/NBenchmark.Integration.MSTest.csproj" />
+    <Project Path="src/NBenchmark.Integration.NUnit/NBenchmark.Integration.NUnit.csproj" />
+    <Project Path="src/NBenchmark.Integration.xUnit/NBenchmark.Integration.xUnit.csproj" />
+  </Folder>
+  <Folder Name="/Reporters/">
+    <Project Path="src/NBenchmark.Reporters.Console/NBenchmark.Reporters.Console.csproj" />
+  </Folder>
+  <Folder Name="/Samples/">
+    <Project Path="samples/Categories/Categories.csproj" />
+    <Project Path="samples/CrossClassSignificance/CrossClassSignificance.csproj" />
+    <Project Path="samples/DependencyInjection/DependencyInjection.csproj" />
+    <Project Path="samples/ExtensibleStats/ExtensibleStats.csproj" />
+    <Project Path="samples/Harness/Harness.csproj" />
+    <Project Path="samples/IsolatedRuns/IsolatedRuns.csproj" />
+    <Project Path="samples/MeasurementProfiles/MeasurementProfiles.csproj" />
+    <Project Path="samples/MultiLaunch/MultiLaunch.csproj" />
+    <Project Path="samples/MultiRuntimeHarness/MultiRuntimeHarness.csproj" />
+    <Project Path="samples/MultiRuntimeSuite/MultiRuntimeSuite.csproj" />
+    <Project Path="samples/Parametric/Parametric.csproj" />
+    <Project Path="samples/PreparedState/PreparedState.csproj" />
+    <Project Path="samples/ReportDetail/ReportDetail.csproj" />
+    <Project Path="samples/Single/Single.csproj" />
+    <Project Path="samples/Suite/Suite.csproj" />
+    <Project Path="samples/SuiteAdvanced/SuiteAdvanced.csproj" />
+    <Project Path="samples/SuiteParameters/SuiteParameters.csproj" />
+    <Project Path="samples/Telemetry/Telemetry.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="tests/NBenchmark.AotProbe/NBenchmark.AotProbe.csproj" />
+    <Project Path="tests/NBenchmark.Analyzers.Tests/NBenchmark.Analyzers.Tests.csproj" />
+    <Project Path="tests/NBenchmark.DependencyInjection.Tests/NBenchmark.DependencyInjection.Tests.csproj" />
+    <Project Path="tests/NBenchmark.Exporters.OpenTelemetry.Tests/NBenchmark.Exporters.OpenTelemetry.Tests.csproj" />
+    <Project Path="tests/NBenchmark.Integration.MSTest.Tests/NBenchmark.Integration.MSTest.Tests.csproj" />
+    <Project Path="tests/NBenchmark.Integration.NUnit.Tests/NBenchmark.Integration.NUnit.Tests.csproj" />
+    <Project Path="tests/NBenchmark.Integration.xUnit.Tests/NBenchmark.Integration.xUnit.Tests.csproj" />
+    <Project Path="tests/NBenchmark.Reporters.Console.Tests/NBenchmark.Reporters.Console.Tests.csproj" />
+    <Project Path="tests/NBenchmark.Tests.ErrorFixtures/NBenchmark.Tests.ErrorFixtures.csproj" />
+    <Project Path="tests/NBenchmark.Tests.IsolationFixture/NBenchmark.Tests.IsolationFixture.csproj" />
+    <Project Path="tests/NBenchmark.Tests.SharedPlanFixture/NBenchmark.Tests.SharedPlanFixture.csproj" />
+    <Project Path="tests/NBenchmark.Tests.WebFixture/NBenchmark.Tests.WebFixture.csproj" />
+    <Project Path="tests/NBenchmark.Tests/NBenchmark.Tests.csproj" />
+  </Folder>
+  <Project Path="src/NBenchmark.DependencyInjection/NBenchmark.DependencyInjection.csproj" />
+  <Project Path="src/NBenchmark.Tool/NBenchmark.Tool.csproj" />
+  <Project Path="src/NBenchmark.Worker/NBenchmark.Worker.csproj" />
+  <Project Path="src/NBenchmark/NBenchmark.csproj" />
+</Solution>

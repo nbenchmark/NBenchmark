@@ -1,4 +1,5 @@
 using NBenchmark.Engine;
+using System.Diagnostics.CodeAnalysis;
 
 namespace NBenchmark.Workers;
 
@@ -22,6 +23,8 @@ namespace NBenchmark.Workers;
 ///         database seeding - happened once per child. A worker calls one factory and nothing else.
 ///     </para>
 /// </remarks>
+[RequiresUnreferencedCode("Runs a benchmark through the worker protocol, which reflects over the body's closure and prepared state and moves both with the reflection-based JSON serializer.")]
+[RequiresDynamicCode("Runs a benchmark through the worker protocol, which reflects over the body's closure and prepared state and moves both with the reflection-based JSON serializer.")]
 internal static class SuitePlanRunner
 {
     /// <summary>

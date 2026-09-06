@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Not a test project: it is an executable that CI publishes with Native AOT and then *runs*. A
+    publish that succeeds proves nothing on its own - the failure mode this catches is an AOT
+    compilation that completes and then throws at the first MakeGenericMethod - so the CI step
+    executes the binary and checks its exit code. See .github/workflows/ci.yml.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <PublishAot>true</PublishAot>
+
+    <!--
+      One warning per offending member rather than the SDK's single "your app may not work"
+      summary. The summary is useless as a gate: it says the same thing whether NBenchmark declared
+      one reflective member or forgot to declare thirty.
+    -->
+    <TrimmerSingleWarn>false</TrimmerSingleWarn>
+
+    <!--
+      The three diagnostics a consumer is *told* about, accepted here on their behalf. They are the
+      declaration working, not a defect:
+
+        IL2026 / IL3050 - Benchmark.Run declares that a run reflects over the body and its state.
+        IL3000          - the worker is located through Assembly.Location, which is empty in a
+                          single-file or AOT-published app. The consequence is already a labelled
+                          one: no worker is found, and the result says IsolationStatus =
+                          InProcessNoWorker rather than quietly claiming isolation.
+
+      Everything else stays an error (TreatWarningsAsErrors is on repository-wide), so a new trim or
+      AOT hazard that NBenchmark did not declare fails this publish. Running the published binary
+      is the other half: an AOT compilation that succeeds and then throws at the first
+      MakeGenericMethod looks identical to success until something executes it.
+    -->
+    <NoWarn>$(NoWarn);IL2026;IL3050;IL3000</NoWarn>
+
+    <!-- Nothing here is worth measuring; the probe measures whether measuring works at all. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/NBenchmark/NBenchmark.csproj"/>
+  </ItemGroup>
+
+</Project>

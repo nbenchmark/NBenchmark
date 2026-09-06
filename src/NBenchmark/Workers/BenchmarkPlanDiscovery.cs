@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using NBenchmark;
 
@@ -7,6 +8,7 @@ namespace NBenchmark.Workers;
 ///     Finds <see cref="BenchmarkPlanAttribute" />-marked factories on a type and binds them as
 ///     delegates the worker can address.
 /// </summary>
+[RequiresUnreferencedCode("Finds the planned benchmark methods on a type by reflection.")]
 internal static class BenchmarkPlanDiscovery
 {
     /// <summary>

@@ -13,9 +13,19 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
+  <!--
+    Pinned low, and deliberately below the central version the analyzer tests use. An analyzer is
+    loaded by the *compiler*, not by the consumer's runtime, so the Roslyn it compiles against is a
+    floor on the SDK that can load it: built against 5.9.0 it silently does nothing in any compiler
+    older than the SDK that shipped that Roslyn. Since the analyzers now ship inside the core
+    NBenchmark package rather than as an opt-in, that floor would be a silent adoption barrier for
+    every consumer on an older SDK, so it is set at the oldest SDK this repository supports
+    building for (8.0.100). Raise it only for an API that is actually needed, and expect to raise
+    the documented minimum SDK with it.
+  -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all"/>
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all"/>
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" VersionOverride="3.11.0"/>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" VersionOverride="4.8.0"/>
   </ItemGroup>
 
   <ItemGroup>

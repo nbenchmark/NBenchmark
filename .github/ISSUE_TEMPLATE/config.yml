@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question or discussion
+    url: https://github.com/nbenchmark/nbenchmark/discussions
+    about: Ask how to measure something, or talk through a result before filing a bug.
+  - name: Documentation
+    url: https://docs.nbenchmark.net
+    about: The statistics, isolation and CLI reference.

@@ -15,7 +15,13 @@
     <Copyright>Copyright (c) 2026 NBenchmark</Copyright>
 
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://www.nbenchmark.net</PackageProjectUrl>
+    <!--
+      The documentation site, which is the one this repository actually publishes (see
+      .github/workflows/deploy-docs.yml) and the one the README sends people to. It pointed at
+      www.nbenchmark.net, so the "Project website" link on nuget.org and the link in the readme
+      packed beside it went to two different places.
+    -->
+    <PackageProjectUrl>https://docs.nbenchmark.net</PackageProjectUrl>
     <PackageIcon>icon.png</PackageIcon>
 
     <!--

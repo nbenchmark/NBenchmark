@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
 using NBenchmark.Discovery;
 using NBenchmark.Workers;
 
 namespace NBenchmark.Engine;
 
+[RequiresUnreferencedCode("Runs a benchmark through the worker protocol, which reflects over the body's closure and prepared state and moves both with the reflection-based JSON serializer.")]
+[RequiresDynamicCode("Runs a benchmark through the worker protocol, which reflects over the body's closure and prepared state and moves both with the reflection-based JSON serializer.")]
 internal sealed record BenchmarkEnvelope(
     string Name,
     string ClassName,

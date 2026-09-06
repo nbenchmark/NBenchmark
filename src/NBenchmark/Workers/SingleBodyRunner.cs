@@ -1,4 +1,5 @@
 using NBenchmark.Engine;
+using System.Diagnostics.CodeAnalysis;
 
 namespace NBenchmark.Workers;
 
@@ -14,6 +15,8 @@ namespace NBenchmark.Workers;
 ///         still synchronous; what changed is where the measurement happens.
 ///     </para>
 /// </summary>
+[RequiresUnreferencedCode("Runs a benchmark through the worker protocol, which reflects over the body's closure and prepared state and moves both with the reflection-based JSON serializer.")]
+[RequiresDynamicCode("Runs a benchmark through the worker protocol, which reflects over the body's closure and prepared state and moves both with the reflection-based JSON serializer.")]
 internal static class SingleBodyRunner
 {
     /// <summary>
