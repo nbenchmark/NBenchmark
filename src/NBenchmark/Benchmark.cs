@@ -43,6 +43,12 @@ namespace NBenchmark;
 [RequiresDynamicCode("A benchmark run reflects over the body's closure and its prepared state and moves both to the measuring process with the reflection-based JSON serializer, so trimming or AOT compiling the host can change or break what is measured.")]
 public static class Benchmark
 {
+    /// <summary>Measures <paramref name="action" />, isolated in a worker process by default.</summary>
+    /// <param name="action">The body to measure. Must capture nothing that cannot be sent to a worker.</param>
+    /// <param name="options">Measurement settings. Defaults to <see cref="MeasurementOptions.Default" />.</param>
+    /// <param name="name">The display name for this benchmark.</param>
+    /// <param name="progress">An optional sink for run progress notifications.</param>
+    /// <param name="cancellationToken">Cancels the run.</param>
     public static BenchmarkResult Run(Action action,
         MeasurementOptions? options = null,
         string name = "Benchmark",
@@ -50,6 +56,7 @@ public static class Benchmark
         CancellationToken cancellationToken = default)
         => RunRaw(action, options, name, progress, cancellationToken).Result;
 
+    /// <inheritdoc cref="Run(Action, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
     public static BenchmarkResult Run<T>(Func<T> action,
         MeasurementOptions? options = null,
         string name = "Benchmark",
@@ -57,6 +64,7 @@ public static class Benchmark
         CancellationToken cancellationToken = default)
         => RunRaw(action, options, name, progress, cancellationToken).Result;
 
+    /// <inheritdoc cref="Run(Action, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
     public static async Task<BenchmarkResult> RunAsync(Func<Task> action,
         MeasurementOptions? options = null,
         string name = "Benchmark",
@@ -64,6 +72,7 @@ public static class Benchmark
         CancellationToken cancellationToken = default)
         => (await RunRawAsync(action, options, name, progress, cancellationToken).ConfigureAwait(false)).Result;
 
+    /// <inheritdoc cref="Run(Action, MeasurementOptions?, string, IBenchmarkProgress?, CancellationToken)" />
     public static async Task<BenchmarkResult> RunAsync<T>(Func<Task<T>> action,
         MeasurementOptions? options = null,
         string name = "Benchmark",

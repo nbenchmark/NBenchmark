@@ -3,6 +3,7 @@ using NBenchmark.Stats;
 
 namespace NBenchmark.Reporters;
 
+/// <summary>Writes a Markdown table of results to a file. Registered under the name <c>markdown</c>.</summary>
 public sealed class MarkdownReporter : IReporter
 {
     private const int BarWidth = 15;
@@ -10,12 +11,14 @@ public sealed class MarkdownReporter : IReporter
     private readonly string? _fileName;
     private readonly string? _outputDirectory;
 
+    /// <summary>Creates a reporter that writes to <paramref name="outputDirectory" /> (or the run's default) as <paramref name="fileName" /> (or a generated name).</summary>
     public MarkdownReporter(string? outputDirectory = null, string? fileName = null)
     {
         _outputDirectory = outputDirectory is null ? null : PathValidation.ValidateOutputPath(outputDirectory);
         _fileName = fileName;
     }
 
+    /// <inheritdoc />
     public string Name => "markdown";
 
     /// <summary>
@@ -28,6 +31,7 @@ public sealed class MarkdownReporter : IReporter
     /// </remarks>
     internal string? LastWrittenPath { get; private set; }
 
+    /// <inheritdoc />
     public async Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,
         ReportContext context,

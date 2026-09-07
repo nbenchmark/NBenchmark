@@ -6,6 +6,10 @@ using Spectre.Console.Rendering;
 
 namespace NBenchmark.Reporters.Console;
 
+/// <summary>
+///     Renders benchmark results to the console as comparison tables, timing/allocation detail,
+///     a distribution chart, and interpretation/warning text - built on Spectre.Console.
+/// </summary>
 public sealed class ConsoleReporter : IReporter
 {
     private const int BarWidth = 12;
@@ -19,8 +23,10 @@ public sealed class ConsoleReporter : IReporter
     private const string MedianStyle = "bold yellow";
     private const string OutlierStyle = "indianred1";
 
+    /// <summary>The reporter's registry name: <c>console</c>.</summary>
     public string Name => "console";
 
+    /// <inheritdoc />
     public Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,
         ReportContext context,

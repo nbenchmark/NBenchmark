@@ -4,6 +4,9 @@ using System.Text.Json.Serialization;
 
 namespace NBenchmark.Reporters;
 
+/// <summary>Writes results as indented JSON to a file. Registered under the name <c>json</c>.</summary>
+/// <param name="outputDirectory">The directory to write to, or <c>null</c> to use the run's default.</param>
+/// <param name="fileName">The file name to write, or <c>null</c> to generate one from a timestamp and counter.</param>
 [RequiresUnreferencedCode("Writes the report with the reflection-based JSON serializer.")]
 [RequiresDynamicCode("Writes the report with the reflection-based JSON serializer.")]
 public sealed class JsonReporter(string? outputDirectory = null, string? fileName = null) : IReporter
@@ -19,6 +22,7 @@ public sealed class JsonReporter(string? outputDirectory = null, string? fileNam
     private readonly string? _outputDirectory =
         outputDirectory is null ? null : PathValidation.ValidateOutputPath(outputDirectory);
 
+    /// <inheritdoc />
     public string Name => "json";
 
     /// <summary>
@@ -38,6 +42,7 @@ public sealed class JsonReporter(string? outputDirectory = null, string? fileNam
     /// </remarks>
     internal string? LastWrittenPath { get; private set; }
 
+    /// <inheritdoc />
     public async Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,
         ReportContext context,

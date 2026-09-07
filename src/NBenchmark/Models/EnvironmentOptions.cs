@@ -16,6 +16,7 @@ namespace NBenchmark;
 /// </summary>
 public record EnvironmentOptions
 {
+    /// <summary>The default options: no affinity, priority, or host-quality warnings, thread control on.</summary>
     public static readonly EnvironmentOptions Default = new();
 
     /// <summary>

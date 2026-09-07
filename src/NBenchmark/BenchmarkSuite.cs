@@ -64,6 +64,18 @@ public class BenchmarkSuite(string name)
 
     // --- Parameter-free Add overloads ---
 
+    /// <summary>
+    ///     Registers a benchmark with no parameter sweep, measured in a dedicated worker process by
+    ///     default alongside the rest of the suite (see <see cref="WithIsolation" />).
+    /// </summary>
+    /// <param name="name">The benchmark's display name. Must be unique within the suite.</param>
+    /// <param name="action">The measured code.</param>
+    /// <param name="setup">Per-iteration setup, run outside the timed region, before each sample.</param>
+    /// <param name="teardown">Per-iteration teardown, run outside the timed region, after each sample.</param>
+    /// <param name="categories">
+    ///     Category tags for this benchmark, consulted by <see cref="FilterCategories" />. Defaults to
+    ///     whatever <see cref="WithCategories" /> had pending when this was called.
+    /// </param>
     public BenchmarkSuite Add(string name, Action action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
@@ -72,6 +84,7 @@ public class BenchmarkSuite(string name)
                     spec with { SampleSetup = setup, SampleTeardown = teardown }, ct)),
             action, setup, teardown);
 
+    /// <inheritdoc cref="Add(string, Action, Action?, Action?, IReadOnlyList{string}?)" />
     public BenchmarkSuite Add(string name, Func<Task> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
@@ -80,6 +93,7 @@ public class BenchmarkSuite(string name)
                     spec with { SampleSetup = setup, SampleTeardown = teardown }, ct).ConfigureAwait(false),
             action, setup, teardown);
 
+    /// <inheritdoc cref="Add(string, Action, Action?, Action?, IReadOnlyList{string}?)" />
     public BenchmarkSuite Add<T>(string name, Func<T> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
@@ -88,6 +102,7 @@ public class BenchmarkSuite(string name)
                     spec with { SampleSetup = setup, SampleTeardown = teardown }, ct)),
             action, setup, teardown);
 
+    /// <inheritdoc cref="Add(string, Action, Action?, Action?, IReadOnlyList{string}?)" />
     public BenchmarkSuite Add<T>(string name, Func<Task<T>> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
@@ -157,6 +172,18 @@ public class BenchmarkSuite(string name)
 
     // --- Parameterized Add overloads: arity 1 ---
 
+    /// <summary>
+    ///     Registers a benchmark over a value swept with <see cref="WithParameter{T}(string, T[])" />
+    ///     (or its recipe overload), expanding into one benchmark per declared value.
+    /// </summary>
+    /// <typeparam name="T">The swept parameter's type.</typeparam>
+    /// <param name="name">The benchmark's display name. Must be unique within the suite.</param>
+    /// <param name="action">The measured code, receiving the swept value.</param>
+    /// <param name="setup">Per-iteration setup, run outside the timed region, before each sample.</param>
+    /// <param name="teardown">Per-iteration teardown, run outside the timed region, after each sample.</param>
+    /// <param name="categories">
+    ///     Category tags for this benchmark, consulted by <see cref="FilterCategories" />.
+    /// </param>
     public BenchmarkSuite Add<T>(string name, Action<T> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
@@ -187,6 +214,7 @@ public class BenchmarkSuite(string name)
         return this;
     }
 
+    /// <inheritdoc cref="Add{T}(string, Action{T}, Action?, Action?, IReadOnlyList{string}?)" />
     public BenchmarkSuite Add<T>(string name, Func<T, Task> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
@@ -219,6 +247,7 @@ public class BenchmarkSuite(string name)
         return this;
     }
 
+    /// <inheritdoc cref="Add{T}(string, Action{T}, Action?, Action?, IReadOnlyList{string}?)" />
     public BenchmarkSuite Add<T, TResult>(string name, Func<T, TResult> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
@@ -249,6 +278,7 @@ public class BenchmarkSuite(string name)
         return this;
     }
 
+    /// <inheritdoc cref="Add{T}(string, Action{T}, Action?, Action?, IReadOnlyList{string}?)" />
     public BenchmarkSuite Add<T, TResult>(string name, Func<T, Task<TResult>> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
@@ -283,6 +313,20 @@ public class BenchmarkSuite(string name)
 
     // --- Parameterized Add overloads: arity 2 ---
 
+    /// <summary>
+    ///     Registers a benchmark over two values, each swept with its own
+    ///     <see cref="WithParameter{T}(string, T[])" /> call, expanding combinatorially into one
+    ///     benchmark per pair of declared values.
+    /// </summary>
+    /// <typeparam name="T1">The first swept parameter's type.</typeparam>
+    /// <typeparam name="T2">The second swept parameter's type.</typeparam>
+    /// <param name="name">The benchmark's display name. Must be unique within the suite.</param>
+    /// <param name="action">The measured code, receiving the swept values.</param>
+    /// <param name="setup">Per-iteration setup, run outside the timed region, before each sample.</param>
+    /// <param name="teardown">Per-iteration teardown, run outside the timed region, after each sample.</param>
+    /// <param name="categories">
+    ///     Category tags for this benchmark, consulted by <see cref="FilterCategories" />.
+    /// </param>
     public BenchmarkSuite Add<T1, T2>(string name, Action<T1, T2> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
@@ -315,6 +359,7 @@ public class BenchmarkSuite(string name)
         return this;
     }
 
+    /// <inheritdoc cref="Add{T1, T2}(string, Action{T1, T2}, Action?, Action?, IReadOnlyList{string}?)" />
     public BenchmarkSuite Add<T1, T2>(string name, Func<T1, T2, Task> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
@@ -349,6 +394,7 @@ public class BenchmarkSuite(string name)
         return this;
     }
 
+    /// <inheritdoc cref="Add{T1, T2}(string, Action{T1, T2}, Action?, Action?, IReadOnlyList{string}?)" />
     public BenchmarkSuite Add<T1, T2, TResult>(string name, Func<T1, T2, TResult> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
@@ -381,6 +427,7 @@ public class BenchmarkSuite(string name)
         return this;
     }
 
+    /// <inheritdoc cref="Add{T1, T2}(string, Action{T1, T2}, Action?, Action?, IReadOnlyList{string}?)" />
     public BenchmarkSuite Add<T1, T2, TResult>(string name, Func<T1, T2, Task<TResult>> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
@@ -417,6 +464,21 @@ public class BenchmarkSuite(string name)
 
     // --- Parameterized Add overloads: arity 3 ---
 
+    /// <summary>
+    ///     Registers a benchmark over three values, each swept with its own
+    ///     <see cref="WithParameter{T}(string, T[])" /> call, expanding combinatorially into one
+    ///     benchmark per triple of declared values.
+    /// </summary>
+    /// <typeparam name="T1">The first swept parameter's type.</typeparam>
+    /// <typeparam name="T2">The second swept parameter's type.</typeparam>
+    /// <typeparam name="T3">The third swept parameter's type.</typeparam>
+    /// <param name="name">The benchmark's display name. Must be unique within the suite.</param>
+    /// <param name="action">The measured code, receiving the swept values.</param>
+    /// <param name="setup">Per-iteration setup, run outside the timed region, before each sample.</param>
+    /// <param name="teardown">Per-iteration teardown, run outside the timed region, after each sample.</param>
+    /// <param name="categories">
+    ///     Category tags for this benchmark, consulted by <see cref="FilterCategories" />.
+    /// </param>
     public BenchmarkSuite Add<T1, T2, T3>(string name, Action<T1, T2, T3> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
@@ -451,6 +513,7 @@ public class BenchmarkSuite(string name)
         return this;
     }
 
+    /// <inheritdoc cref="Add{T1, T2, T3}(string, Action{T1, T2, T3}, Action?, Action?, IReadOnlyList{string}?)" />
     public BenchmarkSuite Add<T1, T2, T3>(string name, Func<T1, T2, T3, Task> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
@@ -487,6 +550,7 @@ public class BenchmarkSuite(string name)
         return this;
     }
 
+    /// <inheritdoc cref="Add{T1, T2, T3}(string, Action{T1, T2, T3}, Action?, Action?, IReadOnlyList{string}?)" />
     public BenchmarkSuite Add<T1, T2, T3, TResult>(string name, Func<T1, T2, T3, TResult> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
@@ -521,6 +585,7 @@ public class BenchmarkSuite(string name)
         return this;
     }
 
+    /// <inheritdoc cref="Add{T1, T2, T3}(string, Action{T1, T2, T3}, Action?, Action?, IReadOnlyList{string}?)" />
     public BenchmarkSuite Add<T1, T2, T3, TResult>(string name, Func<T1, T2, T3, Task<TResult>> action,
         Action? setup = null, Action? teardown = null,
         IReadOnlyList<string>? categories = null)
@@ -748,6 +813,10 @@ public class BenchmarkSuite(string name)
 
     private void EnsureAddNameUnique(string name) => EnsureUniqueName(name);
 
+    /// <summary>
+    ///     Names the benchmark every other result in the suite is compared against for significance
+    ///     and percent-change reporting.
+    /// </summary>
     public BenchmarkSuite WithBaseline(string name)
     {
         _baselineName = name;
@@ -813,6 +882,7 @@ public class BenchmarkSuite(string name)
         return this;
     }
 
+    /// <summary>Measures allocations as well as time. On by default.</summary>
     public BenchmarkSuite WithAllocations(bool enabled = true)
     {
         _options = _options with { MeasureAllocations = enabled };
@@ -929,6 +999,7 @@ public class BenchmarkSuite(string name)
     }
 
 
+    /// <summary>Which samples to trim before the statistics are computed.</summary>
     public BenchmarkSuite WithOutlierMode(OutlierMode mode)
     {
         _options = _options with { OutlierMode = mode };
@@ -967,18 +1038,21 @@ public class BenchmarkSuite(string name)
         return this;
     }
 
+    /// <summary>The confidence level for the reported interval, for example <c>0.95</c>.</summary>
     public BenchmarkSuite WithConfidenceLevel(double level)
     {
         _options = _options with { ConfidenceLevel = level };
         return this;
     }
 
+    /// <summary>Turns the significance comparison on or off. On by default.</summary>
     public BenchmarkSuite WithSignificance(bool enabled = true)
     {
         _options = _options with { EnableSignificance = enabled };
         return this;
     }
 
+    /// <summary>The alpha a p-value must clear to count as significant. Defaults to <c>0.05</c>.</summary>
     public BenchmarkSuite WithSignificanceLevel(double level)
     {
         _options = _options with { SignificanceLevel = level };
@@ -1131,24 +1205,31 @@ public class BenchmarkSuite(string name)
         return this;
     }
 
+    /// <summary>Sets the order benchmarks run in. Randomized by default.</summary>
     public BenchmarkSuite WithRunOrder(RunOrder order)
     {
         _runOrder = order;
         return this;
     }
 
+    /// <summary>Runs once before the whole suite, ahead of any benchmark's own warmup.</summary>
     public BenchmarkSuite WithSuiteSetup(Action setup)
     {
         _suiteSetup = setup;
         return this;
     }
 
+    /// <summary>Runs once after the whole suite, once every benchmark has been measured.</summary>
     public BenchmarkSuite WithSuiteTeardown(Action teardown)
     {
         _suiteTeardown = teardown;
         return this;
     }
 
+    /// <summary>
+    ///     Attaches a reporter that renders the suite's results once the run completes.
+    ///     Repeatable: each call adds another reporter, and all attached reporters run.
+    /// </summary>
     public BenchmarkSuite WithReporter(IReporter reporter)
     {
         ArgumentNullException.ThrowIfNull(reporter);
@@ -1169,6 +1250,10 @@ public class BenchmarkSuite(string name)
         return this;
     }
 
+    /// <summary>
+    ///     Attaches a progress reporter that receives suite-level start/completion callbacks as the
+    ///     run proceeds. Defaults to <see cref="NullBenchmarkProgress.Instance" />.
+    /// </summary>
     public BenchmarkSuite WithProgress(IBenchmarkProgress progress)
     {
         _progress = progress;

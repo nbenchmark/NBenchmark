@@ -4,6 +4,9 @@ using System.Reflection;
 
 namespace NBenchmark.Reporters;
 
+/// <summary>A registered reporter's name and human-readable description, as shown by e.g. <c>--help</c>.</summary>
+/// <param name="Name">The reporter's registered name (as passed to <c>--reporter</c>).</param>
+/// <param name="Description">A short, human-readable description of what the reporter does.</param>
 public sealed record ReporterInfo(string Name, string Description);
 
 /// <summary>
@@ -52,6 +55,11 @@ public static class ReporterRegistry
     private static IReadOnlyList<ReporterInfo>? _autoAttachedCache;
     private static int _extensionsLoaded;
 
+    /// <summary>
+    ///     The list of explicit opt-in reporters registered via <see cref="Register" /> (built-in plus
+    ///     any self-registered by a satellite package), as offered by <c>--reporter &lt;name&gt;</c>.
+    ///     Distinct from <see cref="AutoAttached" />.
+    /// </summary>
     public static IReadOnlyList<ReporterInfo> Available
     {
         [RequiresUnreferencedCode("Discovers the satellite packages' registrations by probing the entry assembly's references; trimming removes what the probe looks for.")]
@@ -92,6 +100,14 @@ public static class ReporterRegistry
         }
     }
 
+    /// <summary>
+    ///     Registers an explicit opt-in reporter under <paramref name="name" />, selectable via
+    ///     <c>--reporter &lt;name&gt;</c>. The same name cannot also be registered via
+    ///     <see cref="RegisterAutoAttach" />.
+    /// </summary>
+    /// <param name="name">The reporter's unique name (case-insensitive).</param>
+    /// <param name="description">A short, human-readable description shown alongside <paramref name="name" />.</param>
+    /// <param name="factory">Builds a fresh reporter instance from an optional output directory.</param>
     public static void Register(string name, string description, Func<string?, IReporter> factory)
     {
         ArgumentNullException.ThrowIfNull(name);

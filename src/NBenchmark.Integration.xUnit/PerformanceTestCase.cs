@@ -7,11 +7,16 @@ using Xunit.Sdk;
 
 namespace NBenchmark.Integration.xUnit;
 
+/// <summary>
+///     An xUnit test case that measures its method with NBenchmark and fails it against the thresholds
+///     carried in <see cref="PerformanceTestData" />, instead of invoking the method directly.
+/// </summary>
 public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
 {
     private PerformanceTestData? _data;
     private string? _skipReason;
 
+    /// <summary>Deserialization constructor. Do not call directly; see <see cref="Deserialize" />.</summary>
     [Obsolete("Called by the deserializer; should only be called by deriving classes for de-serialization purposes")]
     public PerformanceTestCase()
     {
@@ -30,12 +35,14 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
         _skipReason = data.SkipReason;
     }
 
+    /// <summary>Serializes the test case, including its performance thresholds.</summary>
     public override void Serialize(IXunitSerializationInfo info)
     {
         base.Serialize(info);
         info.AddValue(nameof(_data), _data);
     }
 
+    /// <summary>Restores the test case, including its performance thresholds, on a discovery/execution round trip.</summary>
     public override void Deserialize(IXunitSerializationInfo info)
     {
         base.Deserialize(info);
@@ -51,6 +58,7 @@ public sealed class PerformanceTestCase : XunitTestCase, IXunitTestCase
         CancellationTokenSource cancellationTokenSource)
         => RunPerformanceTestAsync(messageBus, constructorArguments, aggregator, cancellationTokenSource);
 
+    /// <summary>The skip reason carried by <see cref="PerformanceTestData" />, falling back to the base behavior.</summary>
     protected override string GetSkipReason(IAttributeInfo factAttribute) =>
         _skipReason ?? base.GetSkipReason(factAttribute);
 

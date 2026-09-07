@@ -1,9 +1,16 @@
 namespace NBenchmark;
 
+/// <summary>
+///     Controls which runtime diagnostic counters are collected during measurement, and
+///     shapes the resulting <see cref="DiagnosticsResult" />. See
+///     <see cref="MeasurementOptions.Diagnostics" />.
+/// </summary>
 public sealed record DiagnosticsOptions
 {
+    /// <summary>The default: GC collection counts only (cheap, always available).</summary>
     public static readonly DiagnosticsOptions Default = new() { GcCollectionCounts = true };
 
+    /// <summary>Every counter enabled.</summary>
     public static readonly DiagnosticsOptions All = new()
     {
         GcCollectionCounts = true,
@@ -12,16 +19,22 @@ public sealed record DiagnosticsOptions
         CpuTime = true,
     };
 
+    /// <summary>No counters collected.</summary>
     public static readonly DiagnosticsOptions None = new();
 
+    /// <summary>Whether Gen0/Gen1/Gen2 collection counts are collected.</summary>
     public bool GcCollectionCounts { get; init; }
 
+    /// <summary>Whether managed heap committed/fragmented bytes are collected.</summary>
     public bool GcHeapInfo { get; init; }
 
+    /// <summary>Whether the per-operation exception count is collected.</summary>
     public bool Exceptions { get; init; }
 
+    /// <summary>Whether CPU time and the CPU/wall ratio are collected.</summary>
     public bool CpuTime { get; init; }
 
+    /// <summary>Whether any counter is enabled.</summary>
     public bool Any => GcCollectionCounts || GcHeapInfo || Exceptions || CpuTime;
 
     internal DiagnosticsMode ToMode()

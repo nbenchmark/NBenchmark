@@ -74,6 +74,7 @@ public sealed record InterferenceOptions
     /// </summary>
     internal const double DefaultHighRejectionWarningFraction = 0.2;
 
+    /// <summary>The default options: the filter enabled, with every threshold at its documented default.</summary>
     public static readonly InterferenceOptions Default = new();
 
     /// <summary>The filter switched off. No samples are ever rejected on evidence.</summary>

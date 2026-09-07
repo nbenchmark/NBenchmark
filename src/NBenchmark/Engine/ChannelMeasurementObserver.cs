@@ -56,12 +56,16 @@ public sealed class ChannelMeasurementObserver : IMeasurementObserver
     /// </summary>
     public bool WantsSampleStream => true;
 
+    /// <inheritdoc />
     public void OnPhase(in MeasurementPhaseEvent e) => _writer.TryWrite(new MeasurementEvent(e));
 
+    /// <inheritdoc />
     public void OnSample(in SampleEvent e) => _writer.TryWrite(new MeasurementEvent(e));
 
+    /// <inheritdoc />
     public void OnDetector(in DetectorStateEvent e) => _writer.TryWrite(new MeasurementEvent(e));
 
+    /// <inheritdoc />
     public void OnResult(BenchmarkResult result)
     {
         // The interface contract allows a null result (NullMeasurementObserver.OnResult is

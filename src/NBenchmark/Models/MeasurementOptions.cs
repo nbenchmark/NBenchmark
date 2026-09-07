@@ -52,6 +52,7 @@ public record MeasurementOptions
     internal static readonly IReadOnlyList<double> DefaultReportedPercentiles =
         Array.AsReadOnly(new[] { 0.50, 0.95, 0.99, 0.999, 1.0 });
 
+    /// <summary>The default options: everything auto-tuned, GC natural, significance testing on.</summary>
     public static readonly MeasurementOptions Default = new();
     private readonly double _confidenceLevel = 0.95;
     private readonly int _histogramBucketCount = 20;
@@ -233,6 +234,10 @@ public record MeasurementOptions
         MeasureAllocations = MeasureAllocations ?? true,
     };
 
+    /// <summary>
+    ///     The built-in outlier-trimming strategy applied before statistics are computed. Ignored when
+    ///     <see cref="OutlierDetector" /> is set. Default <see cref="NBenchmark.OutlierMode.IqrFence" />.
+    /// </summary>
     public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
 
     /// <summary>
@@ -431,6 +436,11 @@ public record MeasurementOptions
     /// </remarks>
     public bool StreamSamples { get; init; }
 
+    /// <summary>
+    ///     Whether a benchmark is compared against its baseline for statistical significance. On by
+    ///     default; set to <c>false</c> to skip the test entirely, leaving
+    ///     <see cref="SignificanceVerdict.NotTested" /> on every result.
+    /// </summary>
     public bool EnableSignificance { get; init; } = true;
 
     /// <summary>

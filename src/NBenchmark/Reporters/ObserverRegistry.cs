@@ -39,6 +39,11 @@ public static class ObserverRegistry
     private static int _extensionsLoaded;
     private static readonly object _lock = new();
 
+    /// <summary>
+    ///     The list of explicit opt-in observers registered via <see cref="Register" /> (built-in plus
+    ///     any self-registered by a satellite package), as offered by <c>--observer &lt;name&gt;</c>.
+    ///     Distinct from <see cref="AutoAttached" />.
+    /// </summary>
     public static IReadOnlyList<ObserverInfo> Available
     {
         [RequiresUnreferencedCode("Discovers the satellite packages' registrations by probing the entry assembly's references; trimming removes what the probe looks for.")]

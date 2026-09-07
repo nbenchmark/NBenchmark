@@ -3,6 +3,9 @@ using NBenchmark.Stats;
 
 namespace NBenchmark.Reporters;
 
+/// <summary>Writes results as CSV to a file. Registered under the name <c>csv</c>.</summary>
+/// <param name="outputDirectory">The directory to write to, or <c>null</c> to use the run's default.</param>
+/// <param name="fileName">The file name to write, or <c>null</c> to generate one from a timestamp and counter.</param>
 public sealed class CsvReporter(string? outputDirectory = null, string? fileName = null) : IReporter
 {
     private static int _fileCounter;
@@ -10,6 +13,7 @@ public sealed class CsvReporter(string? outputDirectory = null, string? fileName
     private readonly string? _outputDirectory =
         outputDirectory is null ? null : PathValidation.ValidateOutputPath(outputDirectory);
 
+    /// <inheritdoc />
     public string Name => "csv";
 
     /// <summary>
@@ -22,6 +26,7 @@ public sealed class CsvReporter(string? outputDirectory = null, string? fileName
     /// </remarks>
     internal string? LastWrittenPath { get; private set; }
 
+    /// <inheritdoc />
     public async Task ReportAsync(
         IReadOnlyList<BenchmarkResult> results,
         ReportContext context,

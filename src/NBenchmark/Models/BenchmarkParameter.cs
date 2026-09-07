@@ -5,6 +5,9 @@ using System.Text.Json.Serialization;
 
 namespace NBenchmark;
 
+/// <summary>One named argument of a parameterised benchmark, as reported on a result.</summary>
+/// <param name="Name">The parameter's name, as declared on the benchmark.</param>
+/// <param name="Value">The value this row was measured with.</param>
 public sealed record BenchmarkParameter(string Name, object? Value)
 {
     /// <summary>
@@ -44,6 +47,11 @@ public sealed record BenchmarkParameter(string Name, object? Value)
     public static string FormatDisplayName(string baseName, IReadOnlyList<BenchmarkParameter> paramSet)
         => paramSet.Count == 0 ? baseName : $"{baseName}({FormatLabel(paramSet)})";
 
+    /// <summary>
+    ///     Builds a stable grouping key for a parameter set, distinguishing values by both their
+    ///     formatted text and their type name so an in-process row and its isolated counterpart with
+    ///     the same displayed value land in the same group.
+    /// </summary>
     public static string GetKey(IReadOnlyList<BenchmarkParameter> paramSet)
     {
         if (paramSet.Count == 0)

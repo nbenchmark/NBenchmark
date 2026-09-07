@@ -2,8 +2,14 @@ using NBenchmark.Stats;
 
 namespace NBenchmark;
 
+/// <summary>
+///     The full outcome of measuring one benchmark: descriptive statistics, distribution shape,
+///     allocation and diagnostics data, significance versus a baseline, and the provenance of how
+///     and where it was measured.
+/// </summary>
 public record BenchmarkResult
 {
+    /// <summary>The benchmark's name, including any parameter suffix (e.g. <c>Sort(size=10)</c>).</summary>
     public required string Name { get; init; }
 
     /// <summary>
@@ -12,11 +18,23 @@ public record BenchmarkResult
     /// </summary>
     public string ClassName { get; init; } = "";
 
+    /// <summary>Optional free-text description of the benchmark, if one was supplied.</summary>
     public string? Description { get; init; }
 
+    /// <summary>The mean per-op time, in nanoseconds, over the trimmed samples.</summary>
     public required double MeanNs { get; init; }
+
+    /// <summary>The median per-op time, in nanoseconds, over the trimmed samples.</summary>
     public required double MedianNs { get; init; }
+
+    /// <summary>
+    ///     The minimum per-op time, in nanoseconds. Follows <see cref="TailMetricsBasis" />.
+    /// </summary>
     public required double MinNs { get; init; }
+
+    /// <summary>
+    ///     The maximum per-op time, in nanoseconds. Follows <see cref="TailMetricsBasis" />.
+    /// </summary>
     public required double MaxNs { get; init; }
 
     /// <summary>
@@ -34,23 +52,37 @@ public record BenchmarkResult
     /// </summary>
     public LatencyHistogram? Histogram { get; init; }
 
+    /// <summary>The standard deviation of the per-op time, in nanoseconds, over the trimmed samples.</summary>
     public required double StandardDeviationNs { get; init; }
 
+    /// <summary>The standard error of the mean, in nanoseconds (<see cref="StandardDeviationNs" /> / √n).</summary>
     public double StandardErrorNs { get; init; }
 
+    /// <summary>The half-width of the confidence interval on the mean, in nanoseconds, at <see cref="ConfidenceLevel" />.</summary>
     public double MarginOfErrorNs { get; init; }
 
+    /// <summary>The confidence level (e.g. 0.95 for 95%) the mean's interval was computed at.</summary>
     public double ConfidenceLevel { get; init; } = 0.95;
 
+    /// <summary>The coefficient of variation (<see cref="StandardDeviationNs" /> / <see cref="MeanNs" />) over the trimmed samples.</summary>
     public double CoefficientOfVariation { get; init; }
 
+    /// <summary>The first quartile (25th percentile) of the per-op time, in nanoseconds.</summary>
     public required double Q1Ns { get; init; }
+
+    /// <summary>The third quartile (75th percentile) of the per-op time, in nanoseconds.</summary>
     public required double Q3Ns { get; init; }
+
+    /// <summary>The interquartile range (<see cref="Q3Ns" /> - <see cref="Q1Ns" />), in nanoseconds.</summary>
     public required double InterquartileRangeNs { get; init; }
 
+    /// <summary>The lower outlier fence, in nanoseconds, used by the fence-based outlier detectors. <c>null</c> when not applicable to the active detector.</summary>
     public double? LowerFenceNs { get; init; }
+
+    /// <summary>The upper outlier fence, in nanoseconds, used by the fence-based outlier detectors. <c>null</c> when not applicable to the active detector.</summary>
     public double? UpperFenceNs { get; init; }
 
+    /// <summary>The number of raw samples the outlier detector discarded before computing statistics.</summary>
     public required int OutliersRemoved { get; init; }
 
     /// <summary>
@@ -80,8 +112,13 @@ public record BenchmarkResult
     /// </summary>
     public IReadOnlyList<double> RawSamples { get; init; } = [];
 
+    /// <summary>The skewness of the trimmed sample distribution. Not meaningful below 3 samples.</summary>
     public required double Skewness { get; init; }
+
+    /// <summary>The excess kurtosis of the trimmed sample distribution. Not meaningful below 4 samples.</summary>
     public required double Kurtosis { get; init; }
+
+    /// <summary>The median absolute deviation of the trimmed samples, in nanoseconds.</summary>
     public required double MedianAbsoluteDeviationNs { get; init; }
 
     /// <summary>
@@ -103,10 +140,16 @@ public record BenchmarkResult
     /// </summary>
     public ShiftEstimate? MedianShift { get; init; }
 
+    /// <summary>The median per-op allocation, in bytes. <c>null</c> when allocation tracking was off or unavailable.</summary>
     public required long? AllocatedBytesMedian { get; init; }
+
+    /// <summary>The P95 per-op allocation, in bytes. <c>null</c> when allocation tracking was off or unavailable.</summary>
     public required long? AllocatedBytesP95 { get; init; }
+
+    /// <summary>The maximum per-op allocation, in bytes. <c>null</c> when allocation tracking was off or unavailable.</summary>
     public required long? AllocatedBytesMax { get; init; }
 
+    /// <summary>The mean per-op allocation, in bytes. <c>null</c> when allocation tracking was off or unavailable.</summary>
     public long? AllocatedBytesMean { get; init; }
 
     /// <summary>
@@ -128,7 +171,10 @@ public record BenchmarkResult
     /// </summary>
     public long TotalOperations { get; init; }
 
+    /// <summary>The p-value from the pairwise significance test versus the baseline. <c>null</c> when not tested.</summary>
     public double? PValue { get; init; }
+
+    /// <summary>The pooled significance verdict versus the baseline. <see cref="NBenchmark.SignificanceVerdict.NotTested" /> when significance testing did not run.</summary>
     public SignificanceVerdict SignificanceVerdict { get; init; }
 
     /// <summary>
@@ -168,18 +214,28 @@ public record BenchmarkResult
     /// </summary>
     public string SignificanceTestName { get; init; } = DefaultSignificanceTest.Instance.Name;
 
+    /// <summary>The significance level (alpha) this result was tested against. Default 0.05.</summary>
     public double SignificanceLevel { get; init; } = 0.05;
 
+    /// <summary>Whether the benchmark threw during measurement. When <c>true</c>, statistics fields are zeroed and <see cref="ErrorMessage" /> carries the reason.</summary>
     public bool Errored { get; init; }
+
+    /// <summary>The exception message, when <see cref="Errored" /> is <c>true</c>; otherwise <c>null</c>.</summary>
     public string? ErrorMessage { get; init; }
 
+    /// <summary>The number of warmup samples discarded before measurement began.</summary>
     public int WarmupSamples { get; init; }
+
+    /// <summary>When this benchmark's measurement started.</summary>
     public DateTimeOffset RunAtUtc { get; init; } = DateTimeOffset.UtcNow;
 
+    /// <summary>The total wall-clock time spent on this benchmark, including warmup and calibration.</summary>
     public TimeSpan TotalDuration { get; init; } = TimeSpan.Zero;
 
+    /// <summary>The wall-clock time spent in the measurement phase only, excluding warmup and calibration.</summary>
     public TimeSpan MeasuredDuration { get; init; } = TimeSpan.Zero;
 
+    /// <summary>Whether this result is the baseline of its comparison group.</summary>
     public bool IsBaseline { get; init; }
 
     /// <summary>
@@ -196,6 +252,7 @@ public record BenchmarkResult
     /// </summary>
     public string TargetFramework { get; init; } = "";
 
+    /// <summary>The built-in outlier-trimming strategy used, when no custom detector was configured.</summary>
     public OutlierMode OutlierMode { get; init; } = OutlierMode.IqrFence;
 
     /// <summary>
@@ -296,6 +353,7 @@ public record BenchmarkResult
     /// </summary>
     public IsolationStatus IsolationStatus { get; init; } = IsolationStatus.InProcessRequested;
 
+    /// <summary>Setup or measurement warnings surfaced for this benchmark. Empty when there are none.</summary>
     public IReadOnlyList<string> Warnings { get; init; } = [];
 
     /// <summary>
@@ -332,11 +390,22 @@ public record BenchmarkResult
     /// </summary>
     public HostTimeline? HostTimeline { get; init; }
 
+    /// <summary>Lower bound of the confidence interval on the mean, in nanoseconds.</summary>
     public double ConfidenceIntervalLowerNs => MeanNs - MarginOfErrorNs;
+
+    /// <summary>Upper bound of the confidence interval on the mean, in nanoseconds.</summary>
     public double ConfidenceIntervalUpperNs => MeanNs + MarginOfErrorNs;
+
+    /// <summary>The spread between <see cref="MaxNs" /> and <see cref="MinNs" />, in nanoseconds.</summary>
     public double RangeNs => MaxNs - MinNs;
+
+    /// <summary><see cref="StandardErrorNs" /> as a percentage of <see cref="MeanNs" />; 0 when the mean is not positive.</summary>
     public double StandardErrorPercent => MeanNs > 0 ? StandardErrorNs / MeanNs * 100 : 0;
+
+    /// <summary><see cref="MarginOfErrorNs" /> as a percentage of <see cref="MeanNs" />; 0 when the mean is not positive.</summary>
     public double MarginOfErrorPercent => MeanNs > 0 ? MarginOfErrorNs / MeanNs * 100 : 0;
+
+    /// <summary><see cref="CoefficientOfVariation" /> expressed as a percentage.</summary>
     public double CoefficientOfVariationPercent => CoefficientOfVariation * 100;
 
     /// <summary>

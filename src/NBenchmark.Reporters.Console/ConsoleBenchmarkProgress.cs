@@ -4,6 +4,11 @@ using SysConsole = System.Console;
 
 namespace NBenchmark.Reporters.Console;
 
+/// <summary>
+///     Renders live run progress to the console: a header naming the suite, a per-benchmark status
+///     line with a progress bar or indeterminate indicator and ETA, and a one-line result on
+///     completion.
+/// </summary>
 public class ConsoleBenchmarkProgress : IBenchmarkProgress
 {
     private readonly Stopwatch _benchmarkStopwatch = new();
@@ -17,6 +22,7 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
     private int _pulse;
     private int _suiteTotal;
 
+    /// <inheritdoc />
     public Task OnSuiteStartingAsync(
         IReadOnlyList<string> benchmarkNames, int total, CancellationToken cancellationToken)
     {
@@ -36,6 +42,7 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task OnWarmupStartingAsync(string name, int totalWarmupSamples, CancellationToken cancellationToken)
     {
         _inWarmup = true;
@@ -45,12 +52,14 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task OnWarmupCompletedAsync(string name, CancellationToken cancellationToken)
     {
         _inWarmup = false;
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task OnBenchmarkStartingAsync(string name, int index, int total, CancellationToken cancellationToken)
     {
         _currentName = name;
@@ -62,6 +71,7 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task OnSampleCompletedAsync(
         string name, int sample, int totalSamples, CancellationToken cancellationToken)
     {
@@ -71,6 +81,7 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task OnBenchmarkCompletedAsync(BenchmarkResult result, CancellationToken cancellationToken)
     {
         _completedBenchmarks++;
@@ -101,6 +112,7 @@ public class ConsoleBenchmarkProgress : IBenchmarkProgress
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task OnSuiteCompletedAsync(
         IReadOnlyList<BenchmarkResult> results, CancellationToken cancellationToken)
     {

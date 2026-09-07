@@ -3,8 +3,16 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace NBenchmark;
 
+/// <summary>Convenience extensions for a single <see cref="BenchmarkResult" />.</summary>
 public static class BenchmarkResultExtensions
 {
+    /// <summary>
+    ///     Prints this result to the console in a boxed, human-readable layout, including provenance
+    ///     (isolated worker vs. host process, and under which runtime configuration).
+    /// </summary>
+    /// <param name="result">The result to print.</param>
+    /// <param name="detail">How much of the result to show. Defaults to <see cref="ReportDetail.Simple" />.</param>
+    /// <returns><paramref name="result" />, unchanged, so the call can be chained.</returns>
     public static BenchmarkResult Print(this BenchmarkResult result, ReportDetail detail = ReportDetail.Simple)
     {
         Console.WriteLine();

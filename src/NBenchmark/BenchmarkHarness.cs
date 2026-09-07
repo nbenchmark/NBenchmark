@@ -12,6 +12,10 @@ using NBenchmark.Workers;
 
 namespace NBenchmark;
 
+/// <summary>
+///     Harness mode entry point: discovers <c>[Benchmark]</c>-decorated methods across one or more
+///     assemblies and measures them, isolated in a worker process per class by default.
+/// </summary>
 [RequiresUnreferencedCode("Harness mode discovers [Benchmark] methods by reflecting over the assembly's types, and the run itself reflects over the discovered members; a trimmed or AOT-compiled app keeps neither.")]
 [RequiresDynamicCode("Harness mode discovers [Benchmark] methods by reflecting over the assembly's types, and the run itself reflects over the discovered members; a trimmed or AOT-compiled app keeps neither.")]
 public sealed class BenchmarkHarness
@@ -128,6 +132,11 @@ public sealed class BenchmarkHarness
     /// </summary>
     private MeasurementOptions ChildLaunchOptions => MergeCliOptions(_options, _cliArgs);
 
+    /// <summary>
+    ///     Creates a harness configured from command-line arguments: reporters, observers, detail
+    ///     level, and every other <c>--</c> flag understood by <see cref="CliArgs" />.
+    /// </summary>
+    /// <param name="args">The process's command-line arguments, forwarded from <c>Main</c>.</param>
     public static BenchmarkHarness Create(string[] args)
     {
         var cliArgs = CliArgs.Parse(args);
@@ -153,18 +162,26 @@ public sealed class BenchmarkHarness
         return harness;
     }
 
+    /// <summary>Adds every <c>[Benchmark]</c> method discovered in <typeparamref name="T" />'s assembly.</summary>
+    /// <typeparam name="T">Any type from the assembly to scan.</typeparam>
     public BenchmarkHarness AddFromAssembly<T>()
     {
         _assemblies.Add(typeof(T).Assembly);
         return this;
     }
 
+    /// <inheritdoc cref="AddFromAssembly{T}" />
+    /// <param name="assembly">The assembly to scan for <c>[Benchmark]</c> methods.</param>
     public BenchmarkHarness AddFromAssembly(Assembly assembly)
     {
         _assemblies.Add(assembly);
         return this;
     }
 
+    /// <summary>
+    ///     Attaches a reporter that renders the run's results once it completes. Repeatable: each
+    ///     call adds another reporter, and all attached reporters run.
+    /// </summary>
     public BenchmarkHarness WithReporter(IReporter reporter)
     {
         ArgumentNullException.ThrowIfNull(reporter);
@@ -174,6 +191,10 @@ public sealed class BenchmarkHarness
         return this;
     }
 
+    /// <summary>
+    ///     Replaces the harness's whole <see cref="MeasurementOptions" /> in one call.
+    /// </summary>
+    /// <remarks>See <see cref="BenchmarkSuite.WithOptions" /> for why this exists.</remarks>
     public BenchmarkHarness WithOptions(MeasurementOptions options)
     {
         _options = options;
@@ -203,6 +224,8 @@ public sealed class BenchmarkHarness
         return this;
     }
 
+    /// <inheritdoc cref="BenchmarkSuite.WithRunOrder" />
+    /// <remarks><c>--run-order</c> wins over this.</remarks>
     public BenchmarkHarness WithRunOrder(RunOrder order)
     {
         _runOrder = order;
@@ -221,6 +244,7 @@ public sealed class BenchmarkHarness
         return this;
     }
 
+    /// <inheritdoc cref="BenchmarkSuite.WithProgress" />
     public BenchmarkHarness WithProgress(IBenchmarkProgress progress)
     {
         _progress = progress;
@@ -228,6 +252,11 @@ public sealed class BenchmarkHarness
         return this;
     }
 
+    /// <summary>
+    ///     Attaches a non-perturbing measurement observer. See
+    ///     <see cref="BenchmarkSuite.WithObserver(IMeasurementObserver)" /> for the contract a
+    ///     callback must honour. Repeatable: each call adds another observer.
+    /// </summary>
     public BenchmarkHarness WithObserver(IMeasurementObserver observer)
     {
         if (observer is not null && observer != NullMeasurementObserver.Instance)
@@ -782,6 +811,11 @@ public sealed class BenchmarkHarness
         return this;
     }
 
+    /// <summary>
+    ///     Sets the default lifetime of a discovered benchmark class's instance, for classes that do
+    ///     not pin their own via <c>[Instance(...)]</c>. Defaults to <see cref="InstanceLifetime.PerMethod" />
+    ///     (a fresh instance per benchmark method).
+    /// </summary>
     public BenchmarkHarness WithInstanceLifetime(InstanceLifetime lifetime)
     {
         _defaultInstanceLifetime = lifetime;
@@ -806,6 +840,11 @@ public sealed class BenchmarkHarness
         return this;
     }
 
+    /// <summary>
+    ///     Discovers and measures every configured benchmark, then reports the results through the
+    ///     attached reporters.
+    /// </summary>
+    /// <returns>The completed results, in the order the benchmarks ran.</returns>
     public async Task<IReadOnlyList<BenchmarkResult>> RunAsync(CancellationToken cancellationToken = default)
     {
         // Mirror --otlp-endpoint for the duration of this run so isolated children inherit the

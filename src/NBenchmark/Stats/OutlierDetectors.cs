@@ -79,8 +79,10 @@ public static class OutlierDetectors
 /// <summary>Keeps every sample. No trimming.</summary>
 public sealed class NoOutlierDetector : IOutlierDetector
 {
+    /// <inheritdoc />
     public string Name => "none";
 
+    /// <inheritdoc />
     public OutlierClassification Classify(ReadOnlySpan<double> sortedSamples) =>
         OutlierClassification.KeepAll(sortedSamples);
 }
@@ -96,8 +98,10 @@ public sealed class TopPercentileOutlierDetector(double fraction = 0.05) : IOutl
         ? fraction
         : throw new ArgumentOutOfRangeException(nameof(fraction), fraction, "fraction must be strictly between 0 and 1.");
 
+    /// <inheritdoc />
     public string Name => $"top {_fraction * 100:0.#}%";
 
+    /// <inheritdoc />
     public OutlierClassification Classify(ReadOnlySpan<double> sortedSamples)
     {
         var keep = (int)Math.Floor(sortedSamples.Length * (1.0 - _fraction));
@@ -123,8 +127,10 @@ public sealed class TwoSidedPercentileOutlierDetector(double fraction = 0.05) : 
         ? fraction
         : throw new ArgumentOutOfRangeException(nameof(fraction), fraction, "fraction must be strictly between 0 and 0.5.");
 
+    /// <inheritdoc />
     public string Name => $"top & bottom {_fraction * 100:0.#}%";
 
+    /// <inheritdoc />
     public OutlierClassification Classify(ReadOnlySpan<double> sortedSamples)
     {
         var trimEach = (int)Math.Floor(sortedSamples.Length * _fraction);
@@ -155,8 +161,10 @@ public sealed class IqrFenceOutlierDetector(double k = 1.5) : IOutlierDetector
         ? k
         : throw new ArgumentOutOfRangeException(nameof(k), k, "k must be positive.");
 
+    /// <inheritdoc />
     public string Name => $"IQR fence ({_k:0.#}×)";
 
+    /// <inheritdoc />
     public OutlierClassification Classify(ReadOnlySpan<double> sortedSamples)
     {
         if (sortedSamples.Length == 0)
@@ -194,8 +202,10 @@ public sealed class MadOutlierDetector(double threshold = 3.0) : IOutlierDetecto
         ? threshold
         : throw new ArgumentOutOfRangeException(nameof(threshold), threshold, "threshold must be positive.");
 
+    /// <inheritdoc />
     public string Name => $"MAD ({_threshold:0.#}×)";
 
+    /// <inheritdoc />
     public OutlierClassification Classify(ReadOnlySpan<double> sortedSamples)
     {
         if (sortedSamples.Length < 3)

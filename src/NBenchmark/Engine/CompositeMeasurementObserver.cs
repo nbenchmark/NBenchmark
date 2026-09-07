@@ -61,6 +61,7 @@ public sealed class CompositeMeasurementObserver : IMeasurementObserver
         WantsSampleStream = _observers.Any(o => o.WantsSampleStream);
     }
 
+    /// <inheritdoc />
     public void OnPhase(in MeasurementPhaseEvent e)
     {
         foreach (var observer in _observers)
@@ -78,6 +79,7 @@ public sealed class CompositeMeasurementObserver : IMeasurementObserver
         }
     }
 
+    /// <inheritdoc />
     public void OnSample(in SampleEvent e)
     {
         foreach (var observer in _observers)
@@ -95,6 +97,7 @@ public sealed class CompositeMeasurementObserver : IMeasurementObserver
         }
     }
 
+    /// <inheritdoc />
     public void OnDetector(in DetectorStateEvent e)
     {
         foreach (var observer in _observers)
@@ -112,6 +115,7 @@ public sealed class CompositeMeasurementObserver : IMeasurementObserver
         }
     }
 
+    /// <inheritdoc />
     public void OnResult(BenchmarkResult result)
     {
         foreach (var observer in _observers)

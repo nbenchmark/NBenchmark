@@ -8,16 +8,22 @@ using NUnit.Framework.Internal.Commands;
 
 namespace NBenchmark.Integration.NUnit;
 
+/// <summary>
+///     An NUnit test command that measures its method with NBenchmark and fails it against
+///     <see cref="PerformanceAttribute" />'s thresholds, instead of invoking the method directly.
+/// </summary>
 public sealed class PerformanceCommand : DelegatingTestCommand
 {
     private readonly PerformanceAttribute _attribute;
 
+    /// <summary>Wraps <paramref name="innerCommand" />, replacing its execution with a measured run.</summary>
     public PerformanceCommand(TestCommand innerCommand, PerformanceAttribute attribute)
         : base(innerCommand)
     {
         _attribute = attribute;
     }
 
+    /// <summary>Measures the test method and records the gate's outcome on the test result.</summary>
     public override TestResult Execute(TestExecutionContext context)
     {
         var testMethod = (TestMethod)Test;

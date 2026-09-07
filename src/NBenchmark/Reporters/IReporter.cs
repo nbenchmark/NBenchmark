@@ -1,7 +1,13 @@
 namespace NBenchmark.Reporters;
 
+/// <summary>
+///     A pluggable output sink for a completed run's results - console, file, or a custom
+///     destination. Register one with <c>--reporter &lt;name&gt;</c> via
+///     <see cref="ReporterRegistry.Register" />, or pass an instance directly.
+/// </summary>
 public interface IReporter
 {
+    /// <summary>The reporter's name, as used to dedupe explicit and auto-attached reporters.</summary>
     public string Name { get; }
 
     /// <summary>

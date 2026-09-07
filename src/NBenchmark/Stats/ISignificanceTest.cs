@@ -92,8 +92,13 @@ public sealed record SignificanceReport
 /// </summary>
 public enum EffectDirection
 {
+    /// <summary>No directional difference, or the strategy does not report one.</summary>
     None = 0,
+
+    /// <summary>The candidate tends to be higher than the baseline.</summary>
     CandidateHigher,
+
+    /// <summary>The candidate tends to be lower than the baseline.</summary>
     CandidateLower,
 }
 

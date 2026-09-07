@@ -1,5 +1,11 @@
 namespace NBenchmark.Integration.Abstractions;
 
+/// <summary>
+///     The performance gates a benchmark is checked against: absolute limits on time and allocation,
+///     an optional slowdown ratio versus a reference method, the measurement settings to use, and
+///     whether the run must be isolated. Implemented by <see cref="PerformanceThresholds" /> and by
+///     the attribute types that carry the same limits as attribute arguments.
+/// </summary>
 public interface IPerformanceThresholds
 {
     /// <summary>

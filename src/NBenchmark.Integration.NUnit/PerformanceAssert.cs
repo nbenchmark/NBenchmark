@@ -3,8 +3,13 @@ using NUnit.Framework;
 
 namespace NBenchmark.Integration.NUnit;
 
+/// <summary>
+///     NUnit assertion pattern: measures a body with <see cref="Benchmark" /> and immediately asserts it
+///     against <see cref="PerformanceAssertionOptions" />, or validates a result measured elsewhere.
+/// </summary>
 public static class PerformanceAssert
 {
+    /// <summary>Measures <paramref name="action" /> and fails the test if it violates <paramref name="options" />.</summary>
     public static BenchmarkResult Run(
         Action action,
         PerformanceAssertionOptions? options = null,
@@ -19,6 +24,7 @@ public static class PerformanceAssert
         return outcome.Result;
     }
 
+    /// <inheritdoc cref="Run(Action, PerformanceAssertionOptions?, string, CancellationToken)" />
     public static BenchmarkResult Run<T>(
         Func<T> action,
         PerformanceAssertionOptions? options = null,
@@ -33,6 +39,7 @@ public static class PerformanceAssert
         return outcome.Result;
     }
 
+    /// <inheritdoc cref="Run(Action, PerformanceAssertionOptions?, string, CancellationToken)" />
     public static async Task<BenchmarkResult> RunAsync(
         Func<Task> action,
         PerformanceAssertionOptions? options = null,
@@ -50,6 +57,7 @@ public static class PerformanceAssert
         return outcome.Result;
     }
 
+    /// <inheritdoc cref="Run(Action, PerformanceAssertionOptions?, string, CancellationToken)" />
     public static async Task<BenchmarkResult> RunAsync<T>(
         Func<Task<T>> action,
         PerformanceAssertionOptions? options = null,
@@ -67,6 +75,7 @@ public static class PerformanceAssert
         return outcome.Result;
     }
 
+    /// <summary>Fails the test if <paramref name="result" /> violates <paramref name="options" />.</summary>
     public static void Validate(BenchmarkResult result, PerformanceAssertionOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(result);
@@ -80,6 +89,10 @@ public static class PerformanceAssert
         Assert.Fail(BuildFailureMessage(result, violations));
     }
 
+    /// <summary>
+    ///     Fails the test if <paramref name="result" /> violates <paramref name="options" />, using
+    ///     <paramref name="rawSamples" /> for the checks that need the underlying distribution.
+    /// </summary>
     public static void Validate(
         BenchmarkResult result, IReadOnlyList<double> rawSamples, PerformanceAssertionOptions? options = null)
     {

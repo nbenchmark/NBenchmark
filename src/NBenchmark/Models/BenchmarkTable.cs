@@ -5,6 +5,11 @@ using NBenchmark.Stats;
 
 namespace NBenchmark;
 
+/// <summary>
+///     A rendering-ready comparison table built from one or more <see cref="BenchmarkResult" />s:
+///     ranked rows plus the run-level context (warmup/sample counts, confidence and significance
+///     levels, GC and runtime profile) that every reporter needs to render a footer.
+/// </summary>
 public sealed record BenchmarkTable
 {
     /// <summary>
@@ -26,6 +31,7 @@ public sealed record BenchmarkTable
     /// </summary>
     public bool CrossClass { get; init; }
 
+    /// <summary>The ranked rows of this table, one per benchmark (or per parameter/runtime group).</summary>
     public required IReadOnlyList<BenchmarkRow> Rows { get; init; }
     /// <summary>
     ///     When the run this table summarises started. <c>null</c> for an empty table, which has no
@@ -38,11 +44,23 @@ public sealed record BenchmarkTable
     ///     back out. Reporters format it; the model carries the value.
     /// </remarks>
     public required DateTimeOffset? RunAtUtc { get; init; }
+
+    /// <summary>The warmup sample count from the row supplying this table's header context.</summary>
     public required int WarmupSamples { get; init; }
+
+    /// <summary>The measured sample count from the row supplying this table's header context.</summary>
     public required int SampleCount { get; init; }
+
+    /// <summary>The confidence level (e.g. 0.95) the reported intervals were computed at.</summary>
     public required double ConfidenceLevel { get; init; }
+
+    /// <summary>The display name of the outlier-trimming strategy used (e.g. IQR fence).</summary>
     public required string OutlierDetectorName { get; init; }
+
+    /// <summary>The combined wall-clock duration of every result summarised by this table.</summary>
     public required TimeSpan TotalDuration { get; init; }
+
+    /// <summary>The significance level (alpha) benchmarks were tested against. Default 0.05.</summary>
     public double SignificanceLevel { get; init; } = 0.05;
 
     /// <summary>The display name of the pairwise significance strategy used (e.g. Mann-Whitney U).</summary>
@@ -117,6 +135,10 @@ public sealed record BenchmarkTable
     /// </summary>
     public IReadOnlyList<string> ParameterNames { get; init; } = [];
 
+    /// <summary>
+    ///     Builds a single ranked comparison table from a flat list of results, picking a baseline
+    ///     from the successful (non-errored) subset when more than one is present.
+    /// </summary>
     public static BenchmarkTable Build(IReadOnlyList<BenchmarkResult> results)
     {
         var successful = results.Where(r => !r.Errored).ToList();
@@ -130,6 +152,11 @@ public sealed record BenchmarkTable
         return BuildInternal(results, baseline, multiBenchmark);
     }
 
+    /// <summary>
+    ///     Builds one table per class (or, in <see cref="CrossClassMode" />, a single combined
+    ///     table), splitting further into a parameterised table for any class whose benchmarks carry
+    ///     parameter values.
+    /// </summary>
     public static IReadOnlyList<BenchmarkTable> BuildPerClass(IReadOnlyList<BenchmarkResult> results)
     {
         if (results.Count == 0)
@@ -435,6 +462,12 @@ public sealed record BenchmarkTable
         return result.SignificanceVerdict == SignificanceVerdict.Significant ? "✓" : "✗";
     }
 
+    /// <summary>
+    ///     Renders the full advanced-detail statistics block for one row (samples, outliers, range,
+    ///     quartiles, confidence intervals, ratio, significance, moments, percentiles, allocations
+    ///     and diagnostics) as multi-line text. Returns <c>""</c> unless <paramref name="detail" /> is
+    ///     <see cref="ReportDetail.Advanced" />.
+    /// </summary>
     public static string RenderStatsBlock(BenchmarkRow row, ReportDetail detail)
     {
         if (detail != ReportDetail.Advanced)

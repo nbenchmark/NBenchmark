@@ -3,10 +3,15 @@ using Xunit.Abstractions;
 
 namespace NBenchmark.Integration.xUnit;
 
+/// <summary>
+///     The performance thresholds for one <see cref="PerformanceTestCase" />, carried across xUnit's
+///     discovery/execution serialization boundary since the attribute instance itself does not survive it.
+/// </summary>
 public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresholds
 {
     private const string NullSentinel = "\0";
 
+    /// <summary>Deserialization constructor. Do not call directly; see <see cref="Deserialize" />.</summary>
     [Obsolete("Called by the deserializer", true)]
     public PerformanceTestData()
     {
@@ -47,21 +52,62 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
     }
 
     internal string? SkipReason { get; private set; }
+
+    /// <summary>Maximum mean time per operation in nanoseconds, or <see cref="IPerformanceThresholds.Unset" />.</summary>
     public double MaxMeanNs { get; private set; } = -1;
+
+    /// <summary>
+    ///     Maximum median time per operation in nanoseconds, or <see cref="IPerformanceThresholds.Unset" />.
+    ///     See <see cref="IPerformanceThresholds.MaxMedianNs" />.
+    /// </summary>
     public double MaxMedianNs { get; private set; } = -1;
+
+    /// <summary>Maximum 95th-percentile time per operation in nanoseconds, or <see cref="IPerformanceThresholds.Unset" />.</summary>
     public double MaxP95Ns { get; private set; } = -1;
+
+    /// <summary>Maximum mean bytes allocated per operation, or <see cref="IPerformanceThresholds.UnsetBytes" />.</summary>
     public long MaxAllocatedBytes { get; private set; } = -1;
+
+    /// <summary>
+    ///     The name of the method to measure alongside this one as the denominator of
+    ///     <see cref="MaxSlowdownRatio" />, or <c>null</c> when there is no comparison.
+    /// </summary>
     public string? ReferenceMethod { get; private set; }
+
+    /// <summary>
+    ///     Maximum ratio of this measurement to <see cref="ReferenceMethod" />'s, or
+    ///     <see cref="IPerformanceThresholds.Unset" />.
+    /// </summary>
     public double MaxSlowdownRatio { get; private set; }
+
+    /// <summary>Measured samples to take, or <see cref="IPerformanceThresholds.AutoSampleCount" />.</summary>
     public int Samples { get; private set; }
+
+    /// <summary>Warmup samples to take before measuring, or <see cref="IPerformanceThresholds.AutoSampleCount" />.</summary>
     public int WarmupSamples { get; private set; }
+
+    /// <summary>Whether to measure allocations as well as time.</summary>
     public bool MeasureAllocations { get; private set; }
+
+    /// <summary>Which samples to trim before the statistics are computed.</summary>
     public OutlierMode OutlierMode { get; private set; } = OutlierMode.IqrFence;
+
+    /// <summary>The confidence level for the reported interval, e.g. <c>0.95</c>.</summary>
     public double ConfidenceLevel { get; private set; } = 0.95;
+
+    /// <summary>
+    ///     How far past an absolute threshold a measurement may land before the gate fails, as a
+    ///     multiplier of the threshold. <c>1.0</c> fails at the threshold exactly.
+    /// </summary>
     public double MaxAbsoluteThresholdTolerance { get; private set; } = 1.0;
+
+    /// <summary>See <see cref="IPerformanceThresholds.RequireIsolation" />.</summary>
     public bool RequireIsolation { get; private set; }
+
+    /// <summary>See <see cref="IPerformanceThresholds.LaunchCount" />.</summary>
     public int LaunchCount { get; private set; } = 1;
 
+    /// <summary>Writes every threshold to the serialization info, for the discovery/execution round trip.</summary>
     public void Serialize(IXunitSerializationInfo info)
     {
         info.AddValue(nameof(MaxMeanNs), MaxMeanNs);
@@ -81,6 +127,7 @@ public sealed class PerformanceTestData : IXunitSerializable, IPerformanceThresh
         info.AddValue(nameof(SkipReason), SkipReason ?? NullSentinel);
     }
 
+    /// <summary>Restores every threshold from the serialization info, defaulting fields an older build never wrote.</summary>
     public void Deserialize(IXunitSerializationInfo info)
     {
         MaxMeanNs = info.GetValue<double>(nameof(MaxMeanNs));

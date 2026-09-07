@@ -4,6 +4,10 @@ using NBenchmark.Workers;
 
 namespace NBenchmark.DependencyInjection;
 
+/// <summary>
+///     <see cref="BenchmarkHarness" /> extensions for resolving benchmark instances from a
+///     Microsoft.Extensions.DependencyInjection container, with per-instance scoping.
+/// </summary>
 public static class DependencyInjectionHarnessExtensions
 {
     // No root-resolved overload here. BenchmarkHarness.WithServices is the root-resolved form and

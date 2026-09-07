@@ -2,6 +2,12 @@ using NBenchmark.Engine;
 
 namespace NBenchmark.Integration.Abstractions;
 
+/// <summary>
+///     Validates a <see cref="BenchmarkResult" /> against a set of <see cref="PerformanceThresholds" />,
+///     for the <c>PerformanceAssert</c> pattern where the caller has already measured and just wants
+///     the pass/fail decision. Relaxes absolute thresholds on a shared, jittery runner the same way
+///     the attribute-driven gates do.
+/// </summary>
 public static class BenchmarkAssert
 {
     private static HostAssessment? _cachedHostAssessment;
@@ -44,6 +50,15 @@ public static class BenchmarkAssert
         }
     }
 
+    /// <summary>
+    ///     Checks <paramref name="result" /> against <paramref name="thresholds" /> and returns a
+    ///     human-readable message for every threshold it exceeds (mean, median, P95, and allocated
+    ///     bytes), relaxed for shared-runner jitter where <see cref="RegressionTolerance" /> applies.
+    ///     An empty list means every configured threshold was met.
+    /// </summary>
+    /// <param name="result">The measurement to check.</param>
+    /// <param name="thresholds">The limits to check it against; an unset threshold is not checked.</param>
+    /// <returns>The violation messages, or an empty list if <paramref name="result" /> passes.</returns>
     public static IReadOnlyList<string> Validate(BenchmarkResult result, PerformanceThresholds thresholds)
     {
         var violations = new List<string>();
