@@ -746,9 +746,17 @@ public sealed class InlineSuiteIsolationTests : IDisposable
         var spin = results.Single(r => r.Name == "spin");
         var half = results.Single(r => r.Name == "half");
 
+        // Compared on the minimum rather than the median. These two bodies differ by only 2x - the
+        // narrowest margin of any timing ratio in the suite - so unlike the 10x-and-up pairs
+        // elsewhere this one has little room for noise. On a shared CI runner a 200,000-iteration
+        // spin is long enough to be descheduled by the hypervisor mid-loop, and the steal time
+        // lands as a near-constant addition to both bodies, which pulls the ratio towards 1: a
+        // 3 ms tax on a 2 ms spin turns a true 2.0 into a measured 1.4. The minimum is the sample
+        // that got a clean run at the CPU, so it is the estimator that still reflects the work.
         Assert.True(
-            spin.MedianNs > half.MedianNs * 1.5,
-            $"expected the full spin to cost clearly more than half: {spin.MedianNs:F1} vs {half.MedianNs:F1} ns");
+            spin.MinNs > half.MinNs * 1.5,
+            $"expected the full spin to cost clearly more than half: {spin.MinNs:F1} vs {half.MinNs:F1} ns "
+            + $"(medians {spin.MedianNs:F1} vs {half.MedianNs:F1} ns)");
     }
 
     /// <summary>
