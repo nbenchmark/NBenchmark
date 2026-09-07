@@ -357,6 +357,9 @@ internal sealed class BenchmarkDiscoverer
     ///     when the receiver cannot be built, because that is the case where the answer is about
     ///     dependency injection and the bare reflection error names neither DI nor the remedy.
     /// </param>
+    /// <param name="method">The benchmark method the source supplies arguments for.</param>
+    /// <param name="source">The <c>[ArgumentsSource]</c> member to invoke.</param>
+    /// <param name="benchmarkParams">The benchmark method's parameters, in declaration order.</param>
     private static List<(object?[] RawValues, string[]? ParamNames)> MaterialiseCaseTuples(
         MethodInfo method, MethodInfo source, ParameterInfo[] benchmarkParams, bool factoryResolvedInstances)
     {

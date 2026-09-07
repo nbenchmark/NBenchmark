@@ -36,11 +36,15 @@ public sealed class BenchmarkSuite<TState> : BenchmarkSuite
     // --- Typed Add overloads ---
 
     /// <summary>Adds a benchmark receiving the prepared state.</summary>
+    /// <param name="name">The display name for this benchmark, unique within the suite.</param>
+    /// <param name="action">The body to measure, receiving the prepared state.</param>
     /// <param name="setup">
     ///     Per-iteration setup, run outside the timed region. The place to undo a mutation the body makes
     ///     to the shared state - a body like <c>d =&gt; Array.Sort(d)</c> otherwise measures an
     ///     already-sorted array from the second sample onward.
     /// </param>
+    /// <param name="teardown">Per-iteration teardown, run outside the timed region.</param>
+    /// <param name="categories">Optional categories for filtering and grouping in reports.</param>
     /// <param name="prepare">
     ///     This benchmark's own state recipe, in place of the suite's. For the suite whose members
     ///     measure the same operation over <i>different</i> inputs - the ordinary reason to write a

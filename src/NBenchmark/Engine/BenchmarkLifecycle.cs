@@ -10,6 +10,14 @@ internal static class BenchmarkLifecycle
     /// </summary>
     private static readonly object StaticClassReceiver = new();
 
+    /// <param name="type">
+    ///     The benchmark class to instantiate. A static class gets a stand-in receiver rather than an
+    ///     instance.
+    /// </param>
+    /// <param name="instanceFactory">
+    ///     The user-supplied factory or service provider, when the suite registered one. <c>null</c>
+    ///     means construct the type directly.
+    /// </param>
     /// <param name="failure">
     ///     Why the instance could not be created, or <c>null</c> on success. Returned as well as
     ///     printed so a caller can put it on the errored row: the console line scrolls past and is

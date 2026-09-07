@@ -26,11 +26,13 @@ namespace NBenchmark.Integration.Abstractions;
 internal static class TestBodyIsolation
 {
     /// <summary>Whether a test method can be measured in a worker, and why not when it cannot.</summary>
+    /// <param name="CanIsolate"><c>true</c> when the method can be measured in a worker.</param>
     /// <param name="Status">
     ///     The <c>NBenchmark.IsolationStatus</c> value to stamp on the result, as a string so this
     ///     assembly does not have to take a dependency on the enum's declaring assembly purely to
     ///     name a case.
     /// </param>
+    /// <param name="Reason">Why the method cannot be isolated, or <c>null</c> when it can.</param>
     public readonly record struct Decision(bool CanIsolate, string Status, string? Reason)
     {
         internal static Decision Refuse(string status, string reason) => new(false, status, reason);
@@ -49,6 +51,8 @@ internal static class TestBodyIsolation
     ///     The live test-class instance, or <c>null</c> for a static method. Its <i>identity</i> is
     ///     never sent anywhere - only whether an equivalent one could be rebuilt elsewhere.
     /// </param>
+    /// <param name="method">The test method to classify.</param>
+    /// <param name="args">The test framework's argument values for the method.</param>
     public static Decision Classify(MethodInfo method, object? instance, IReadOnlyList<object?> args)
     {
         ArgumentNullException.ThrowIfNull(method);

@@ -700,6 +700,7 @@ public class BenchmarkSuite(string name)
     /// <summary>
     ///     Creates a suite whose benchmarks are measured over prepared state.
     /// </summary>
+    /// <param name="name">The display name for the suite and the prefix for each benchmark in it.</param>
     /// <param name="prepare">
     ///     Builds the value each body receives. Run once per benchmark, before that benchmark's warmup
     ///     and outside the timed region - not once per suite, so two sorts do not share one array and
@@ -1420,6 +1421,7 @@ public class BenchmarkSuite(string name)
     ///     itself is the address: the worker locates that method by metadata token and invokes it,
     ///     so the suite is constructed in the process that measures it.
     /// </param>
+    /// <param name="cancellationToken">Cancels the run.</param>
     /// <remarks>
     ///     <para>
     ///         This is the isolated entry point for Suite mode, and it is strictly better than
@@ -2528,6 +2530,19 @@ public class BenchmarkSuite(string name)
         };
     }
 
+    /// <param name="Name">
+    ///     The display name for this sweep entry - the benchmark name with the parameter labels
+    ///     substituted in.
+    /// </param>
+    /// <param name="Categories">
+    ///     The categories resolved at registration time, from the suite's pending categories and any
+    ///     the registration supplied.
+    /// </param>
+    /// <param name="Factory">
+    ///     Builds the envelope for one parameter combination, given the arguments and the sweep's
+    ///     display name.
+    /// </param>
+    /// <param name="ParamTypes">The runtime types of the parameter values, in declaration order.</param>
     /// <param name="Action">
     ///     The user's own typed lambda, kept beside the factory that wraps it. The factory's own
     ///     metadata token identifies NBenchmark's wrapper; only this points at the method the developer
@@ -2540,6 +2555,10 @@ public class BenchmarkSuite(string name)
     ///     parameterized envelope carried no body, so it was refused for that reason first. It is
     ///     load-bearing now: an addressed body whose hooks were forgotten would be measured in a worker
     ///     with its setup silently dropped.
+    /// </param>
+    /// <param name="SampleTeardown">
+    ///     The per-iteration <c>teardown</c> this registration supplied, if any. Carried for the same
+    ///     reason as <see cref="SampleSetup" />.
     /// </param>
     private sealed record ParameterizedAdd(
         string Name,

@@ -62,6 +62,8 @@ internal enum RefusalReason
 /// <summary>
 ///     A refusal: why, in a form a consumer can branch on, and what to tell the user.
 /// </summary>
+/// <param name="Reason">Which class of failure this is - see <see cref="RefusalReason" />.</param>
+/// <param name="Message">The user-facing explanation, including the remedy where one applies.</param>
 /// <param name="EntangledReceiverIndex">
 ///     Set only for the specific <see cref="RefusalReason.CapturedState" /> shape where this refusal
 ///     is a collision with an object <b>another</b> receiver in the same group already captured - the

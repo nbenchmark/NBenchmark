@@ -579,6 +579,26 @@ internal static class InlineSuitePlan
     ///     order, so <see cref="RunOrder.Random" /> - the default - was silently discarded the moment
     ///     isolation was on, which is now always.
     /// </param>
+    /// <param name="suiteName">The suite's display name, used in the worker's group identity.</param>
+    /// <param name="bodies">The addressed bodies to measure in the worker, one per benchmark.</param>
+    /// <param name="options">The suite's measurement settings, applied to every body.</param>
+    /// <param name="seed">
+    ///     The suite's random seed for <see cref="RunOrder.Random" />, or <c>null</c> to seed from the
+    ///     session.
+    /// </param>
+    /// <param name="replicate">
+    ///     Which replicate of the suite this request measures, used in the group identity and for
+    ///     paired comparison across replicates.
+    /// </param>
+    /// <param name="suiteSetup">
+    ///     The suite-level setup hook, already addressed, or <c>null</c> when the suite has none.
+    /// </param>
+    /// <param name="suiteTeardown">
+    ///     The suite-level teardown hook, already addressed, or <c>null</c> when the suite has none.
+    /// </param>
+    /// <param name="receivers">
+    ///     The group's receiver table, shared by bodies and hooks that closed over the same state.
+    /// </param>
     public static RunGroupPayload Request(
         string suiteName,
         IReadOnlyList<BodyRef> bodies,

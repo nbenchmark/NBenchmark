@@ -149,6 +149,10 @@ public static class Benchmark
     ///     Per-iteration teardown, run outside the timed region, on the same terms as
     ///     <paramref name="setup" />.
     /// </param>
+    /// <param name="options">Measurement settings. Defaults to <see cref="MeasurementOptions.Default" />.</param>
+    /// <param name="name">The display name for this benchmark.</param>
+    /// <param name="progress">An optional sink for run progress notifications.</param>
+    /// <param name="cancellationToken">Cancels the run.</param>
     /// <remarks>
     ///     <paramref name="prepare" /> runs <b>once</b>, not per iteration - see
     ///     <paramref name="setup" /> for the reset that makes a mutating body measurable.
@@ -269,6 +273,18 @@ public static class Benchmark
     ///     <see cref="Guid" />. Anything larger belongs inside <paramref name="prepare" />.
     /// </param>
     /// <param name="body">The measured code, receiving what <paramref name="prepare" /> returned.</param>
+    /// <param name="setup">
+    ///     Per-iteration setup, run outside the timed region, on the same terms as in the
+    ///     parameterless-argument overload - see that overload's <c>setup</c> documentation.
+    /// </param>
+    /// <param name="teardown">
+    ///     Per-iteration teardown, run outside the timed region, on the same terms as
+    ///     <paramref name="setup" />.
+    /// </param>
+    /// <param name="options">Measurement settings. Defaults to <see cref="MeasurementOptions.Default" />.</param>
+    /// <param name="name">The display name for this benchmark.</param>
+    /// <param name="progress">An optional sink for run progress notifications.</param>
+    /// <param name="cancellationToken">Cancels the run.</param>
     public static BenchmarkResult Run<TArg, TState>(
         Func<TArg, TState> prepare, TArg prepareArgument, Action<TState> body,
         Action<TState>? setup = null, Action<TState>? teardown = null,
@@ -783,6 +799,18 @@ public static class Benchmark
     ///     measures. A lambda per shape rather than an overload per shape, because the shapes differ only
     ///     in their return type.
     /// </param>
+    /// <param name="recipes">
+    ///     One recipe per state slot: how to build each prepared value in the measuring process. A
+    ///     <c>null</c> entry leaves the slot unprepared.
+    /// </param>
+    /// <param name="body">The user's body, as written - the delegate the accessor is bound over.</param>
+    /// <param name="prepare">Builds the state, once, before warmup, in the process that measures.</param>
+    /// <param name="setup">Per-iteration setup, run outside the timed region.</param>
+    /// <param name="teardown">Per-iteration teardown, run outside the timed region.</param>
+    /// <param name="options">Measurement settings. Defaults to <see cref="MeasurementOptions.Default" />.</param>
+    /// <param name="name">The display name for this benchmark.</param>
+    /// <param name="progress">An optional sink for run progress notifications.</param>
+    /// <param name="cancellationToken">Cancels the run.</param>
     private static Task<MeasurementOutcome> MeasureOverState<TState, TBody>(
         IReadOnlyList<StateRecipe?> recipes,
         TBody body,

@@ -418,6 +418,12 @@ internal static class StateTransfer
     ///     rebuilding them as two arrays would measure a program the user did not write. That is as
     ///     true of two fields on two different receivers as it is of two fields on one.
     /// </param>
+    /// <param name="receiver">The object whose instance fields to capture.</param>
+    /// <param name="spent">
+    ///     Bytes already committed against the group's budget; updated with this capture's cost.
+    /// </param>
+    /// <param name="captured">The captured fields, on success.</param>
+    /// <param name="refusal">Why the capture cannot cross, on failure.</param>
     public static bool TryCapture(
         object receiver,
         string subject,
@@ -763,6 +769,13 @@ internal static class StateTransfer
     ///     <c>IReadOnlyList&lt;int&gt; xs = new List&lt;int&gt;()</c>, which crosses, and a
     ///     <c>Node[]</c> holding a <c>Leaf</c>, which does not.
     /// </param>
+    /// <param name="declared">The type the position is declared as.</param>
+    /// <param name="value">The value actually sitting at the position, which may be null.</param>
+    /// <param name="walk">
+    ///     The traversal state accumulated so far - visited instances and nesting depth - shared across
+    ///     the whole walk.
+    /// </param>
+    /// <param name="why">Why the value is not faithful to its declared type, on failure.</param>
     private static bool IsFaithfulValue(
         Type declared,
         object? value,

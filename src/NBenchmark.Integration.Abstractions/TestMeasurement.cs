@@ -26,6 +26,8 @@ namespace NBenchmark.Integration.Abstractions;
 internal static class TestMeasurement
 {
     /// <summary>A measurement, and where it was taken.</summary>
+    /// <param name="Result">The measured result, errored when the measurement failed.</param>
+    /// <param name="RawSamples">The raw per-sample readings behind the result.</param>
     /// <param name="Refusal">
     ///     Why the measurement was taken in the test host, when it was. <c>null</c> when isolated.
     /// </param>
@@ -41,12 +43,19 @@ internal static class TestMeasurement
         CalibrationResult? Calibration = null);
 
     /// <summary>One method to measure, and the name to report it under.</summary>
+    /// <param name="Method">The test-framework benchmark method to measure.</param>
+    /// <param name="Arguments">The test case's argument values, in declaration order.</param>
+    /// <param name="Name">The name to report the measurement under.</param>
     public readonly record struct Target(MethodInfo Method, object?[] Arguments, string Name);
 
     /// <summary>
     ///     A candidate and the reference it is compared against, plus the paired ratio between them
     ///     when the two were measured in a way that admits one.
     /// </summary>
+    /// <param name="Candidate">The measured candidate.</param>
+    /// <param name="Reference">
+    ///     The measured reference, or <c>null</c> when the test named none.
+    /// </param>
     /// <param name="PairedRatio">
     ///     The per-replicate ratio with its confidence interval, or <c>null</c> when this pair cannot
     ///     produce one - a single replicate, or a fallback to the test host.
@@ -93,6 +102,16 @@ internal static class TestMeasurement
     ///     <paramref name="runSpec" /> because a launch is a process rather than a property of a
     ///     measurement - see <see cref="LaunchCounts" />. Above one is what produces
     ///     <see cref="MeasuredPair.PairedRatio" />.
+    /// </param>
+    /// <param name="candidate">The method under test, with its arguments and report name.</param>
+    /// <param name="instance">
+    ///     The live test-class instance. Used only for the in-host path and for deciding whether an
+    ///     equivalent could be rebuilt elsewhere - it is never sent anywhere.
+    /// </param>
+    /// <param name="runSpec">The measurement configuration.</param>
+    /// <param name="cancellationToken">Cancels the run.</param>
+    /// <param name="measureCalibration">
+    ///     Whether the worker should also measure <see cref="CalibrationStandard" />.
     /// </param>
     public static async Task<MeasuredPair> MeasurePairAsync(
         Target candidate,
@@ -189,6 +208,14 @@ internal static class TestMeasurement
     ///     the gate will divide by it - that is, when a <c>MaxSlowdownRatio</c> is set with no
     ///     reference method - so that both sides of the ratio come from the same process.
     /// </param>
+    /// <param name="method">The test-framework benchmark method to measure.</param>
+    /// <param name="args">The method's argument values, in declaration order.</param>
+    /// <param name="name">The name to report the measurement under.</param>
+    /// <param name="runSpec">The measurement configuration.</param>
+    /// <param name="launchCount">
+    ///     How many replicates to measure, one worker each. Clamped rather than validated.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the run.</param>
     public static async Task<Measured> MeasureAsync(
         MethodInfo method,
         object? instance,

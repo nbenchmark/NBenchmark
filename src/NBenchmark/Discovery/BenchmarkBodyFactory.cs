@@ -42,6 +42,7 @@ internal static class BenchmarkBodyFactory
     ///     Creates the binder for <paramref name="method" />: given a benchmark instance, it returns
     ///     the delegate to measure.
     /// </summary>
+    /// <param name="method">The discovered benchmark method to build a body for.</param>
     /// <param name="arguments">
     ///     Values to bind into the call, or <c>null</c> / empty when the method takes none.
     /// </param>

@@ -142,9 +142,10 @@ internal static class LogRatio
     ///     <para>
     ///         Indexed rather than "in order" because that is the whole load-bearing assumption. A list
     ///         that had silently dropped its failed launches would line entry 1 up against launch 2 and
-    ///         report the difference between two processes as a property of the code.
+    ///     report the difference between two processes as a property of the code.
     ///     </para>
     /// </param>
+    /// <param name="candidate">The result whose per-launch medians form the numerator of each pair.</param>
     public static RatioEstimate? Estimate(
         BenchmarkResult candidate,
         IReadOnlyList<double> baselineLaunchMedians)

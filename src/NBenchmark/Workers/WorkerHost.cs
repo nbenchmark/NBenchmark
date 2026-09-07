@@ -134,6 +134,11 @@ internal sealed class WorkerHost : IAsyncDisposable
     ///         at any price.
     ///     </para>
     /// </summary>
+    /// <param name="workerAssemblyPath">
+    ///     Path to the worker executable (<c>nbworker</c>), located by <c>WorkerLocator</c>.
+    /// </param>
+    /// <param name="profile">The runtime profile to launch the worker under, or <c>null</c> for the ambient configuration.</param>
+    /// <param name="cancellationToken">Cancels the handshake while it is in progress.</param>
     public static Task<WorkerHost> StartAsync(
         string workerAssemblyPath,
         RuntimeProfile? profile,
@@ -149,6 +154,11 @@ internal sealed class WorkerHost : IAsyncDisposable
     ///     <see cref="SharedFrameworkConfig" />. <c>null</c> for every target that needs nothing beyond
     ///     <c>Microsoft.NETCore.App</c>, which leaves the command line exactly as it was.
     /// </param>
+    /// <param name="workerAssemblyPath">
+    ///     Path to the worker executable (<c>nbworker</c>), located by <c>WorkerLocator</c>.
+    /// </param>
+    /// <param name="profile">The runtime profile to launch the worker under, or <c>null</c> for the ambient configuration.</param>
+    /// <param name="cancellationToken">Cancels the handshake while it is in progress.</param>
     public static async Task<WorkerHost> StartAsync(
         string workerAssemblyPath,
         RuntimeProfile? profile,

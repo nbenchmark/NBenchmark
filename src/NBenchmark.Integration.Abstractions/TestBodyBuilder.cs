@@ -27,6 +27,10 @@ internal static class TestBodyBuilder
     ///     Builds a delegate that invokes <paramref name="method" />, or returns <c>false</c> when
     ///     its shape is not measurable.
     /// </summary>
+    /// <param name="method">The test method to compile into a body.</param>
+    /// <param name="instance">The receiver to invoke the method on, or <c>null</c> for a static method.</param>
+    /// <param name="args">The method's argument values, in declaration order.</param>
+    /// <param name="body">The compiled body, on success.</param>
     /// <param name="isAsync">
     ///     Whether <paramref name="body" /> is a <see cref="Func{Task}" /> rather than an
     ///     <see cref="Action" />. The caller needs this to pick the right measurement overload -

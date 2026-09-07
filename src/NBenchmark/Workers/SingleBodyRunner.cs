@@ -37,6 +37,22 @@ internal static class SingleBodyRunner
     ///     Factories producing the body's arguments, aligned with its parameters and run in the worker
     ///     before warmup. <c>null</c> for the ordinary parameterless body.
     /// </param>
+    /// <param name="name">The display name for this benchmark.</param>
+    /// <param name="body">The body to measure.</param>
+    /// <param name="options">Measurement settings.</param>
+    /// <param name="progress">The sink for run progress notifications.</param>
+    /// <param name="measureInProcess">
+    ///     The in-process measurement to fall back to when the body cannot be addressed. Supplied by
+    ///     the caller because it closes over the binding work the caller already did.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the run.</param>
+    /// <param name="sampleSetup">
+    ///     Per-iteration setup, run outside the timed region, addressed by the same rule as the body.
+    /// </param>
+    /// <param name="sampleTeardown">
+    ///     Per-iteration teardown, run outside the timed region, addressed by the same rule as the
+    ///     body.
+    /// </param>
     public static async Task<(MeasurementOutcome Outcome, IsolationStatus Status)> RunAsync(
         string name,
         Delegate body,

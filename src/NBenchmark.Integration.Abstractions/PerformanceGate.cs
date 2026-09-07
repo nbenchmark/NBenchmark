@@ -71,12 +71,26 @@ internal static class PerformanceGate
     /// <summary>
     ///     Evaluates <paramref name="result" /> against <paramref name="thresholds" />.
     /// </summary>
+    /// <param name="result">The candidate benchmark's measured result.</param>
+    /// <param name="rawSamples">
+    ///     The candidate's raw samples, for a significance-based verdict. <c>null</c> means the
+    ///     caller has none, and the gate then judges medians only.
+    /// </param>
     /// <param name="referenceResult">
     ///     The measured reference benchmark, or <c>null</c> when the test named none. Pass it even
     ///     when it was measured differently from the candidate - deciding what to do about that is
     ///     this method's job, and callers that pre-filtered it used to fall through to the
     ///     calibration comparison instead, which is a <i>worse</i> cross-process ratio than the one
     ///     they were avoiding.
+    /// </param>
+    /// <param name="referenceSamples">
+    ///     The reference benchmark's raw samples, or <c>null</c> when it has none.
+    /// </param>
+    /// <param name="thresholds">The thresholds to apply.</param>
+    /// <param name="allowInProcessGate">
+    ///     Whether a benchmark whose declaring type or assembly opted in with
+    ///     <see cref="AllowInProcessGateAttribute" /> may run the gate on an in-process measurement.
+    ///     <c>false</c> refuses the in-process result.
     /// </param>
     /// <param name="workerCalibration">
     ///     The calibration standard as measured inside the same worker that produced

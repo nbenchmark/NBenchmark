@@ -211,6 +211,10 @@ internal sealed record BodyRef
     ///         one that declines.
     ///     </para>
     /// </summary>
+    /// <param name="body">The delegate to address.</param>
+    /// <param name="displayName">The name to carry on the address, used in diagnostics on both sides.</param>
+    /// <param name="bodyRef">The address, on success.</param>
+    /// <param name="refusal">Why the body cannot be addressed, on failure.</param>
     /// <param name="arguments">
     ///     Values for the body's own parameters, in declaration order. Must match the delegate's
     ///     arity: a mismatch is a refusal rather than a truncation, because binding the wrong number
@@ -222,6 +226,10 @@ internal sealed record BodyRef
     ///     addressed by the same rule as the body, so a factory that captures is refused too: the
     ///     capture is exactly what splitting the shape was supposed to remove, and a factory may carry
     ///     its own argument values for the thing it would otherwise have captured.
+    /// </param>
+    /// <param name="receivers">
+    ///     The group's receiver table, which this body's transferred receiver state is registered
+    ///     into.
     /// </param>
     public static bool TryCreate(
         Delegate body,

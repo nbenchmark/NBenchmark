@@ -94,6 +94,7 @@ public readonly record struct MeasurementPhaseEvent(
 ///     <c>false</c> for measured samples, so a consumer can plot the warmup-settling curve
 ///     alongside the measured stream.
 /// </summary>
+/// <param name="BenchmarkName">The name of the benchmark this sample belongs to.</param>
 /// <param name="Ordinal">The 0-based index of this sample within its phase.</param>
 /// <param name="PerOpNs">The per-op nanoseconds of this sample: elapsed / <paramref name="K" />.</param>
 /// <param name="K">The ops-per-sample count in effect when this sample was timed.</param>

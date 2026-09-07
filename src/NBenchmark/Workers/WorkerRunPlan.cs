@@ -207,6 +207,8 @@ internal static class WorkerRunPlan
     ///     through rather than created here. Callers with no bodies to address pass nothing and get a
     ///     table of their own.
     /// </param>
+    /// <param name="payload">The request being built, unchanged apart from the strategy fields.</param>
+    /// <param name="options">The measurement configuration whose strategies are being addressed.</param>
     public static RunGroupPayload WithStrategies(
         RunGroupPayload payload,
         MeasurementOptions options,
@@ -245,6 +247,27 @@ internal static class WorkerRunPlan
     ///     transferred into. A discovered class has no addressed bodies of its own, so this is the only
     ///     thing that puts entries in it - but it still has to be one table, because a service-provider
     ///     factory and a detector factory can close over the same object.
+    /// </param>
+    /// <param name="declaringType">The discovered benchmark class to measure.</param>
+    /// <param name="benchmarkNames">The class's benchmark method names, in declaration order.</param>
+    /// <param name="options">The measurement configuration.</param>
+    /// <param name="defaultInstanceLifetime">
+    ///     The instance lifetime the class's benchmarks run under unless overridden.
+    /// </param>
+    /// <param name="order">The run order to apply to the bodies the worker receives.</param>
+    /// <param name="sessionSeed">
+    ///     The session's random seed for <see cref="RunOrder.Random" />, or <c>null</c> to seed from
+    ///     the clock.
+    /// </param>
+    /// <param name="startIndex">The benchmark's index within the whole run, for progress reporting.</param>
+    /// <param name="totalBenchmarks">The size of the whole run, for progress reporting.</param>
+    /// <param name="instanceSource">
+    ///     How the worker builds benchmark instances, when the class uses a factory or service
+    ///     provider rather than its constructor. <c>null</c> for the constructor.
+    /// </param>
+    /// <param name="instanceLifetimeOverride">
+    ///     Per-benchmark lifetime override, when the harness registered one. <c>null</c> to use
+    ///     <paramref name="defaultInstanceLifetime" />.
     /// </param>
     public static RunGroupPayload DiscoveredClassRequest(
         Type declaringType,

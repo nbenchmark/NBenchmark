@@ -57,6 +57,14 @@ internal static class RelativeComparison
     ///     needs the numeric values (for example to build a regression-alert UI) rather
     ///     than just the formatted messages.
     /// </summary>
+    /// <param name="candidateResult">The candidate benchmark's measured result.</param>
+    /// <param name="candidateSamples">The candidate's raw samples.</param>
+    /// <param name="referenceResult">The reference benchmark's measured result.</param>
+    /// <param name="referenceSamples">The reference's raw samples.</param>
+    /// <param name="maxSlowdownRatio">The maximum tolerable candidate-over-reference ratio.</param>
+    /// <param name="significanceLevel">
+    ///     The significance level for the pooled-sample Mann-Whitney test.
+    /// </param>
     /// <param name="pairedRatio">
     ///     The paired per-replicate ratio between the two, when they were measured co-resident in two
     ///     or more replicate workers. When present it <b>replaces both halves of the gate's test</b>:

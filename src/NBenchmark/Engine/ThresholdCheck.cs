@@ -182,10 +182,17 @@ internal sealed record RegressionVerdict(
 ///     One regressed candidate: its median, the baseline median, the ratio the gate compared, and the
 ///     absolute delta in nanoseconds. Built by <see cref="ThresholdCheck.Check" />.
 /// </summary>
+/// <param name="Name">The display name of the regressed candidate.</param>
+/// <param name="CandidateMedian">The candidate's median duration, in nanoseconds.</param>
+/// <param name="BaselineMedian">The baseline's median duration, in nanoseconds.</param>
 /// <param name="Ratio">
 ///     The ratio the threshold was applied to: the paired per-replicate estimate when
 ///     <paramref name="Estimate" /> is present, otherwise <c>candidate / baseline</c> (<c>NaN</c> when
 ///     the baseline median is zero).
+/// </param>
+/// <param name="DeltaNs">
+///     The absolute difference between the medians, in nanoseconds; negative when the candidate is
+///     faster than the baseline yet still tripped the paired estimate.
 /// </param>
 /// <param name="Estimate">
 ///     The paired ratio with its interval, when the run had at least two replicates to pair.

@@ -135,12 +135,13 @@ internal sealed record AddressedFactory
     ///     Addresses <paramref name="factory" /> by metadata token, or explains why it cannot be
     ///     addressed.
     /// </summary>
-    /// <remarks>
-    ///     The refusal is <see cref="BodyRef.TryCreate" />'s verbatim, prefixed with the role, because
-    ///     the reasons are identical: a factory that captures is refused for exactly the reason a
-    ///     capturing body is - it would have to run in the coordinator, and what it builds there is
-    ///     the live object that cannot cross.
-    /// </remarks>
+    /// <param name="factory">The delegate to address.</param>
+    /// <param name="role">
+    ///     What the factory is in the plan - "instance factory", "prepare delegate", "suite setup" -
+    ///     used in messages and as the display name when none is supplied.
+    /// </param>
+    /// <param name="addressed">The addressable form of the factory, on success.</param>
+    /// <param name="refusal">Why the factory cannot be addressed, on failure.</param>
     /// <param name="displayName">
     ///     The name carried on the underlying <see cref="BodyRef" />, when it should differ from the
     ///     role - a prepared-state factory is "its prepare delegate" to the reader but is addressed

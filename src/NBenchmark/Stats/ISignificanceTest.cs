@@ -146,6 +146,15 @@ internal static class EffectSizeFactory
 }
 
 /// <summary>A single candidate-versus-baseline significance verdict.</summary>
+/// <param name="Name">The display name of the candidate benchmark.</param>
+/// <param name="PValue">
+///     The strategy's p-value, or <c>null</c> when the strategy does not report one.
+/// </param>
+/// <param name="Verdict">The qualitative verdict the strategy reached.</param>
+/// <param name="Effect">
+///     The optional effect-size payload, when the strategy produced one. See
+///     <see cref="EffectSize" />.
+/// </param>
 /// <param name="Shift">
 ///     The Hodges-Lehmann location shift versus the baseline (candidate − baseline, in the
 ///     samples' units) with a rank-based confidence interval; <c>null</c> when the strategy did not

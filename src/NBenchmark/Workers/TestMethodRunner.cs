@@ -18,12 +18,18 @@ namespace NBenchmark.Workers;
 internal static class TestMethodRunner
 {
     /// <summary>One method to measure, and the name to report it under.</summary>
+    /// <param name="Method">The test-framework benchmark method to measure.</param>
     /// <param name="Arguments">
     ///     The test case's argument values, encoded against each parameter's <i>declared</i> type.
     /// </param>
+    /// <param name="DisplayName">The name to report the subject under.</param>
     public readonly record struct Subject(MethodInfo Method, object?[] Arguments, string DisplayName);
 
     /// <summary>What one subject measured.</summary>
+    /// <param name="Name">The subject's display name, as requested.</param>
+    /// <param name="Result">
+    ///     The measured result for the subject, errored when the worker never reported it.
+    /// </param>
     /// <param name="RawSamples">
     ///     Samples <b>pooled across replicates</b>, for a significance test that wants every
     ///     observation. Deliberately not the same array as <see cref="BenchmarkResult.RawSamples" />
@@ -83,6 +89,8 @@ internal static class TestMethodRunner
     ///     an argument's <i>declared parameter type</i> - not its runtime type - is what has to be
     ///     reconstructible, and only the method knows that.
     /// </remarks>
+    /// <param name="method">The candidate method to check.</param>
+    /// <param name="refusal">Why the method cannot be addressed, on failure.</param>
     /// <param name="options">
     ///     The measurement configuration, so a pinned outlier detector or significance test that a
     ///     worker cannot rebuild is caught here instead of being silently replaced by the built-in one
@@ -133,6 +141,14 @@ internal static class TestMethodRunner
     }
 
     /// <summary>Measures <paramref name="method" /> in a worker.</summary>
+    /// <param name="method">The test-framework benchmark method to measure.</param>
+    /// <param name="arguments">The method's argument values, in declaration order.</param>
+    /// <param name="displayName">The name to report the measurement under.</param>
+    /// <param name="options">The measurement configuration.</param>
+    /// <param name="launchCount">
+    ///     How many workers to spend, one per replicate. Clamped rather than validated.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the run.</param>
     /// <param name="measureCalibration">
     ///     Whether the worker should also measure <see cref="CalibrationStandard" /> and return it on
     ///     <see cref="Outcome.Calibration" />. Ask for it only when the gate will use it - it is
@@ -186,6 +202,12 @@ internal static class TestMethodRunner
     ///     How many workers to spend, one per replicate. Clamped rather than validated, for the reason
     ///     <see cref="LaunchCounts.Clamp" /> gives: the value reaches here from a test attribute, and
     ///     throwing would fail the test with a configuration error instead of measuring it.
+    /// </param>
+    /// <param name="options">The measurement configuration.</param>
+    /// <param name="cancellationToken">Cancels the run.</param>
+    /// <param name="measureCalibration">
+    ///     Whether the worker should also measure <see cref="CalibrationStandard" /> and return it on
+    ///     <see cref="Outcome.Calibration" />.
     /// </param>
     public static async Task<Outcome> RunAsync(
         IReadOnlyList<Subject> subjects,
