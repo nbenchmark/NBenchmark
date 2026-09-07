@@ -13,6 +13,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="MSTest.Analyzers" />
     <PackageReference Include="MSTest.TestFramework"/>
   </ItemGroup>
 
