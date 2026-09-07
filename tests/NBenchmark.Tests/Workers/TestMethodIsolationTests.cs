@@ -9,7 +9,6 @@ namespace NBenchmark.Tests.Workers;
 ///     whose declaring type the worker builds for itself.
 /// </summary>
 [Collection(nameof(RealWorkerCollection))]
-[Trait(IsolationTraits.Name, IsolationTraits.Semantics)]
 public sealed class TestMethodIsolationTests : IDisposable
 {
     private readonly IWorkerLauncher _prior = WorkerLauncher.Current;

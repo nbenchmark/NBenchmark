@@ -1,0 +1,153 @@
+name: Nightly Windows
+
+# The only Windows coverage in the repository. ci.yml runs Linux and macOS on every push and no
+# longer touches Windows at all, because the cost is not the tests but the process starts: the
+# isolation suite spawns a `dotnet exec` measurement worker per test, and process creation is the
+# one operation where Windows is not within a small constant of Linux. That put the push-path
+# Windows job at up to two hours against ten minutes for the other two.
+#
+# So it moved here whole rather than being trimmed: every test, every framework, nothing filtered.
+# What Windows uniquely covers is worth having - three kernel32 interop signatures nothing else
+# exercises, the Windows-only thread-priority branch, and pipe semantics that differ from POSIX in
+# both buffer size and handle inheritance, which is the shape of bug this architecture is most
+# exposed to - it just does not need to be on the critical path to be had.
+#
+# Nightly, and skipped on nights when the default branch has not moved since this last passed, so a
+# quiet week costs nothing. The trade is that a Windows-only break surfaces within a day rather than
+# at the commit that caused it, and blocks no merge.
+
+on:
+  schedule:
+    # 03:37 AEST. Deliberately off the hour: scheduled runs queue behind everyone else's, and the
+    # top of the hour is where the whole world puts its crons.
+    - cron: "37 17 * * *"
+
+  # So the gap can be closed on demand - before a release, or after a change that touches the worker
+  # protocol. A manual run always executes, whether the branch has moved or not.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # For the run-history query below. Declared explicitly because a repository or organisation that
+  # narrows the default token would otherwise fail this at the API call rather than at review.
+  actions: read
+
+jobs:
+  # Answers one question: has the default branch moved since this workflow last passed? Comparing
+  # against the last *successful* run, rather than the last run or a fixed 24-hour window, is what
+  # makes this self-correcting. A night that fails re-runs the next night instead of being written
+  # off, and a night GitHub drops - scheduled runs are best-effort and get dropped under load - does
+  # not silently skip whatever landed during it, because the comparison is to a commit rather than
+  # to a clock.
+  changes:
+    name: Has anything changed?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      should-run: ${{ steps.check.outputs.should-run }}
+    steps:
+      - name: Compare HEAD against the last successful run
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Referenced by filename rather than by numeric id, which is not knowable from inside the
+          # workflow and would not survive the file being recreated.
+          WORKFLOW: nightly-windows.yml
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Started by hand - running regardless of what has changed."
+            echo "should-run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # The branch is github.ref_name rather than anything out of the event payload: a
+          # scheduled run's payload is minimal and cannot be relied on to carry the default branch,
+          # and a schedule only ever runs on the default branch, so ref_name already is it.
+          #
+          # `|| true`, and the empty-string default, because every reason this can come back without
+          # a SHA means the same thing: run. There is no successful run yet, the history has aged
+          # out, or the API is briefly unavailable. Erring towards a wasted nightly is the cheap
+          # mistake; erring towards a silent skip is the expensive one.
+          last=$(gh api \
+            "repos/${{ github.repository }}/actions/workflows/${WORKFLOW}/runs?status=success&branch=${{ github.ref_name }}&per_page=1" \
+            --jq '.workflow_runs[0].head_sha // ""' 2>/dev/null || true)
+
+          echo "Last successful run: ${last:-<none>}"
+          echo "Current HEAD:        ${{ github.sha }}"
+
+          if [ -n "$last" ] && [ "$last" = "${{ github.sha }}" ]; then
+            echo "should-run=false" >> "$GITHUB_OUTPUT"
+            echo "The branch has not moved since that run. Nothing to test."
+            echo "Skipped: no new commits since the last successful nightly (${last})." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "should-run=true" >> "$GITHUB_OUTPUT"
+            echo "The branch has moved. Running the full Windows suite."
+          fi
+
+  windows-full:
+    name: Full Suite (windows-latest)
+    needs: changes
+    if: needs.changes.outputs.should-run == 'true'
+    runs-on: windows-latest
+    # Roughly three times the trimmed push job's framework count and its full test set on top, so a
+    # wide ceiling. This is the job that once ran for two hours; the point of the number is that it
+    # stops rather than that it is tight.
+    timeout-minutes: 120
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # The single biggest lever on this job. Defender scans every newly launched image and its
+      # dependency closure, and the full suite is several hundred `dotnet exec` worker starts per
+      # framework on a 4-vCPU VM.
+      - name: Exclude the build tree from Defender
+        shell: pwsh
+        run: |
+          Add-MpPreference -ExclusionPath "${{ github.workspace }}"
+          Add-MpPreference -ExclusionPath "$env:USERPROFILE\.nuget"
+          Add-MpPreference -ExclusionPath "$env:ProgramFiles\dotnet"
+          Add-MpPreference -ExclusionProcess "dotnet.exe"
+          Add-MpPreference -ExclusionProcess "MSBuild.exe"
+          Add-MpPreference -ExclusionProcess "VBCSCompiler.exe"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build solution
+        run: dotnet build --no-restore --configuration Release
+
+      # No --framework and no --filter: the two things the push job trims are the whole reason this
+      # job exists.
+      - name: Run every test on every framework
+        run: >
+          dotnet test --no-build --configuration Release --verbosity normal
+          --logger trx
+          --results-directory ${{ github.workspace }}/TestResults
+
+      - name: Upload test timings
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-windows-test-results
+          path: TestResults/**/*.trx
+          if-no-files-found: warn

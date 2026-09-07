@@ -19,7 +19,6 @@ namespace NBenchmark.Tests.Workers;
 ///     which silently prefers the value and never says the recipe was there too.
 /// </remarks>
 [Collection(nameof(RealWorkerCollection))]
-[Trait(IsolationTraits.Name, IsolationTraits.Semantics)]
 public sealed class RecipeArgumentWellFormednessTests : IDisposable
 {
     private readonly IWorkerLauncher _prior = WorkerLauncher.Current;

@@ -14,7 +14,6 @@ namespace NBenchmark.Tests.Workers;
 ///     </para>
 /// </summary>
 [Collection(nameof(RealWorkerCollection))]
-[Trait(IsolationTraits.Name, IsolationTraits.Semantics)]
 public sealed class InlineSuiteIsolationTests : IDisposable
 {
     private readonly IWorkerLauncher _prior = WorkerLauncher.Current;

@@ -9,62 +9,40 @@ jobs:
   build:
     # NBenchmark carries more platform-conditional code than most libraries - thread affinity,
     # process priority, core topology and the macOS quality-of-service call each have their own
-    # path, and the tests branch on the operating system rather than skipping. A single-OS run
-    # leaves two thirds of that untested, for a library whose whole claim is accurate measurement.
+    # path, and the tests branch on the operating system rather than skipping. That is the argument
+    # for testing on more than one operating system, and it is why macOS is here rather than Linux
+    # alone: the quality-of-service call has no other home.
+    #
+    # Windows is *not* here. Its cost is process creation - the isolation suite spawns a
+    # `dotnet exec` measurement worker per test, and that is the one operation where Windows is not
+    # within a small constant of Linux - which put this job at up to two hours against ten minutes
+    # for the other two. It now runs in full, on every framework, in .github/workflows/
+    # nightly-windows.yml, skipped on nights when the branch has not moved. The trade that buys:
+    # a Windows-only break is found within a day rather than at the commit, and does not block a
+    # merge. Deliberate, given the ratio.
     name: Build and Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     # Without a ceiling a wedged worker pipe sits on GitHub's 360-minute default, which is six
-    # hours of a runner to learn one test hung. Ubuntu and macOS finish inside ten minutes and
-    # Windows inside forty once the framework fan-out and Defender are dealt with, so this is a
+    # hours of a runner to learn one test hung. Both rows finish inside ten minutes, so this is a
     # stuck-job guard with a wide margin, not a budget.
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         include:
-          # The three-framework sweep runs once, on the fastest runner. What the other two rows
-          # exist for is the platform-conditional code - thread affinity, process priority, core
-          # topology, the macOS quality-of-service call - and none of that varies by target
-          # framework, so running them against net10.0 alone loses no coverage. It does remove two
-          # thirds of the isolation suite's process launches, which is where the Windows job's time
-          # actually goes: the tests in NBenchmark.Tests that spawn a `dotnet exec` measurement
-          # worker cost a process start each, and process creation is the one operation where
-          # Windows is not within a small constant of Linux.
-          #
-          # Windows also skips the isolation tests that assert platform-neutral logic rather than
-          # the worker protocol itself - roughly 150 spawning tests, over half the suite's wall
-          # clock. See tests/NBenchmark.Tests/Workers/IsolationTraits.cs for where the line is and
-          # why. The protocol tests it keeps are the ones that would actually catch a Windows bug:
-          # pipe buffering, handle inheritance, exit codes, muxer resolution.
+          # The three-framework sweep runs once, on the fastest runner. What the macOS row exists
+          # for is the platform-conditional code above, and none of that varies by target framework,
+          # so running it against net10.0 alone loses no coverage while paying for one framework
+          # rather than three.
           - os: ubuntu-latest
             test-frameworks: ""
-            test-filter: ""
-          - os: windows-latest
-            test-frameworks: "--framework net10.0"
-            test-filter: '--filter "Isolation!=Semantics"'
           - os: macos-latest
             test-frameworks: "--framework net10.0"
-            test-filter: ""
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
-      # Defender scans every newly launched image and its dependency closure, which on this repo
-      # means it re-inspects the worker's framework closure on each of ~770 `dotnet exec` starts on
-      # a 4-vCPU VM. Excluding the workspace and the SDK is the difference between seconds and
-      # minutes per launch. The runner account is an administrator, so this needs no elevation.
-      - name: Exclude the build tree from Defender
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          Add-MpPreference -ExclusionPath "${{ github.workspace }}"
-          Add-MpPreference -ExclusionPath "$env:USERPROFILE\.nuget"
-          Add-MpPreference -ExclusionPath "$env:ProgramFiles\dotnet"
-          Add-MpPreference -ExclusionProcess "dotnet.exe"
-          Add-MpPreference -ExclusionProcess "MSBuild.exe"
-          Add-MpPreference -ExclusionProcess "VBCSCompiler.exe"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
@@ -88,21 +66,22 @@ jobs:
       - name: Build solution
         run: dotnet build --no-restore --configuration Release
 
-      # The TRX is the record of where the time went. A job that has to be killed leaves no summary
-      # at all, and "Windows is slow" is not a finding you can act on without per-test durations.
+      # The TRX is the record of where the time went. A job that times out leaves no summary at
+      # all, and "CI got slower" is not a finding anyone can act on without per-test durations -
+      # which is how the isolation suite was identified as two thirds of this suite's wall clock in
+      # the first place.
       # No LogFileName: eight test assemblies share one results directory, and a fixed name means
       # each one overwrites the last, leaving a single project's timings to show for the run.
       - name: Run tests
         run: >
           dotnet test --no-build --configuration Release --verbosity normal
           ${{ matrix.test-frameworks }}
-          ${{ matrix.test-filter }}
           --logger trx
           --results-directory ${{ github.workspace }}/TestResults
 
       - name: Upload test timings
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ matrix.os }}
           path: TestResults/**/*.trx

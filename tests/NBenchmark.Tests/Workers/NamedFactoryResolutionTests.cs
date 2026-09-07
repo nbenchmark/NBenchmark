@@ -22,7 +22,6 @@ namespace NBenchmark.Tests.Workers;
 ///     </para>
 /// </remarks>
 [Collection(nameof(RealWorkerCollection))]
-[Trait(IsolationTraits.Name, IsolationTraits.Semantics)]
 public sealed class NamedFactoryResolutionTests : IDisposable
 {
     private const string FixtureType = "NBenchmark.Tests.IsolationFixture.NamedPlanFixture";
