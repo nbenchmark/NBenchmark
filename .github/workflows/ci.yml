@@ -27,16 +27,24 @@ jobs:
           # topology, the macOS quality-of-service call - and none of that varies by target
           # framework, so running them against net10.0 alone loses no coverage. It does remove two
           # thirds of the isolation suite's process launches, which is where the Windows job's time
-          # actually goes: 386 of the 2106 tests in NBenchmark.Tests each spawn a `dotnet exec`
-          # measurement worker plus a WorkerPrewarm background refill, so a framework is roughly
-          # 770 process starts - cheap on Linux, and the single most expensive thing a Windows
-          # runner does.
+          # actually goes: the tests in NBenchmark.Tests that spawn a `dotnet exec` measurement
+          # worker cost a process start each, and process creation is the one operation where
+          # Windows is not within a small constant of Linux.
+          #
+          # Windows also skips the isolation tests that assert platform-neutral logic rather than
+          # the worker protocol itself - roughly 150 spawning tests, over half the suite's wall
+          # clock. See tests/NBenchmark.Tests/Workers/IsolationTraits.cs for where the line is and
+          # why. The protocol tests it keeps are the ones that would actually catch a Windows bug:
+          # pipe buffering, handle inheritance, exit codes, muxer resolution.
           - os: ubuntu-latest
             test-frameworks: ""
+            test-filter: ""
           - os: windows-latest
             test-frameworks: "--framework net10.0"
+            test-filter: '--filter "Isolation!=Semantics"'
           - os: macos-latest
             test-frameworks: "--framework net10.0"
+            test-filter: ""
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -88,6 +96,7 @@ jobs:
         run: >
           dotnet test --no-build --configuration Release --verbosity normal
           ${{ matrix.test-frameworks }}
+          ${{ matrix.test-filter }}
           --logger trx
           --results-directory ${{ github.workspace }}/TestResults
 

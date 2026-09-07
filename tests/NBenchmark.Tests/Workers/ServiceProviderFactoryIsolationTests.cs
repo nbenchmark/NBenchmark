@@ -26,6 +26,7 @@ namespace NBenchmark.Tests.Workers;
 ///     </para>
 /// </remarks>
 [Collection(nameof(RealWorkerCollection))]
+[Trait(IsolationTraits.Name, IsolationTraits.Semantics)]
 public sealed class ServiceProviderFactoryIsolationTests : IDisposable
 {
     private readonly IWorkerLauncher _prior = WorkerLauncher.Current;
