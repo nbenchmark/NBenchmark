@@ -49,6 +49,33 @@
   </Target>
 
   <!--
+    Guards the deliberately-low Roslyn pins declared in Directory.Build.props. Two failure modes,
+    both of which are silent without this: a package updater rewrites VersionOverride to a literal
+    current version - Rider's did, in the update that produced this target - or the pin properties
+    stop resolving and VersionOverride expands to empty, at which point central package management
+    quietly supplies the much newer central version instead.
+
+    Either one produces analyzer assemblies built against a Roslyn newer than the oldest supported
+    SDK can load, and an analyzer that cannot be loaded does not fail a build - it just never
+    reports anything. Nothing downstream would notice, so the check has to be here.
+
+    Hooked before CollectPackageReferences as well as Build, so that `dotnet restore` on its own
+    fails too: by build time NuGet has already resolved the wrong version into project.assets.json.
+  -->
+  <Target Name="VerifyPinnedRoslynVersions"
+          Condition="'$(NBenchmarkPinsRoslyn)' == 'true'"
+          BeforeTargets="CollectPackageReferences;Build">
+
+    <Error Condition="'$(NBenchmarkRoslynPin)' == '' OR '$(NBenchmarkRoslynAnalyzersPin)' == ''"
+           Code="NBPIN001"
+           Text="The Roslyn pin properties are not set. $(MSBuildProjectName) pins Roslyn low on purpose and resolves its VersionOverride from NBenchmarkRoslynPin / NBenchmarkRoslynAnalyzersPin, which Directory.Build.props is meant to declare. Empty here means central package management would silently substitute the central Microsoft.CodeAnalysis version."/>
+
+    <Error Condition="'%(PackageReference.NBenchmarkPinnedVersion)' != '' AND '%(PackageReference.VersionOverride)' != '%(PackageReference.NBenchmarkPinnedVersion)'"
+           Code="NBPIN002"
+           Text="%(PackageReference.Identity) is pinned at %(PackageReference.NBenchmarkPinnedVersion) in $(MSBuildProjectName) but VersionOverride says '%(PackageReference.VersionOverride)'. This pin is a floor on the SDK that can load the shipped analyzers - read the comment above the PackageReference items in src/NBenchmark.Analyzers/NBenchmark.Analyzers.csproj before changing it. If the raise is intended, change the pin property in Directory.Build.props rather than hardcoding a version here."/>
+  </Target>
+
+  <!--
     Set here rather than in Directory.Build.props: that file is imported before the csproj sets
     IsShippingLibrary, and MSBuild evaluates properties in import order, so a condition on it
     there is always false. Item conditions are evaluated in a later pass, which is why the

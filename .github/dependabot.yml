@@ -16,6 +16,12 @@ updates:
       prefix-development: "chore(dev): "
       include: "scope"
 
+    # A version floor the worker hands out to loaded targets, not a dependency it consumes - see
+    # the comment at the bottom of src/NBenchmark.Worker/NBenchmark.Worker.csproj. It moves when
+    # the OpenTelemetry SDK's own floor moves, which is a deliberate decision, not a patch bump.
+    ignore:
+      - dependency-name: "System.Diagnostics.DiagnosticSource"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

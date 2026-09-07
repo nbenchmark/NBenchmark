@@ -8,6 +8,7 @@
     <IsPackable>false</IsPackable>
     <RootNamespace>NBenchmark.CodeFixes</RootNamespace>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <NBenchmarkPinsRoslyn>true</NBenchmarkPinsRoslyn>
     <DevelopmentDependency>true</DevelopmentDependency>
     <LangVersion>12</LangVersion>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
@@ -15,7 +16,9 @@
 
   <ItemGroup>
     <!-- Pinned low for the same reason as NBenchmark.Analyzers - see the comment there. -->
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" PrivateAssets="all" VersionOverride="4.8.0"/>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" PrivateAssets="all"
+                      VersionOverride="$(NBenchmarkRoslynPin)"
+                      NBenchmarkPinnedVersion="$(NBenchmarkRoslynPin)"/>
   </ItemGroup>
 
   <ItemGroup>

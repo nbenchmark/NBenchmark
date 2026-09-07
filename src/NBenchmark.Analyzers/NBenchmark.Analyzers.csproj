@@ -8,6 +8,7 @@
     <IsPackable>false</IsPackable>
     <RootNamespace>NBenchmark.Analyzers</RootNamespace>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <NBenchmarkPinsRoslyn>true</NBenchmarkPinsRoslyn>
     <DevelopmentDependency>true</DevelopmentDependency>
     <LangVersion>12</LangVersion>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
@@ -24,8 +25,12 @@
     the documented minimum SDK with it.
   -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" VersionOverride="3.11.0"/>
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" VersionOverride="4.8.0"/>
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all"
+                      VersionOverride="$(NBenchmarkRoslynAnalyzersPin)"
+                      NBenchmarkPinnedVersion="$(NBenchmarkRoslynAnalyzersPin)"/>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all"
+                      VersionOverride="$(NBenchmarkRoslynPin)"
+                      NBenchmarkPinnedVersion="$(NBenchmarkRoslynPin)"/>
   </ItemGroup>
 
   <ItemGroup>

@@ -15,6 +15,22 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
+  <!--
+    The Roslyn floor the shipping analyzer and code-fix assemblies compile against, declared here
+    rather than as a literal in each csproj for two reasons: one place to change it, and a package
+    updater - Rider's, Dependabot's - cannot recognise a version to bump inside a property
+    reference, so it leaves the pin alone instead of silently raising it.
+
+    These are floors, not "current" versions. See the comment above the PackageReference items in
+    src/NBenchmark.Analyzers/NBenchmark.Analyzers.csproj for why they are deliberately below the
+    central version, and what raising them costs. VerifyPinnedRoslynVersions in
+    Directory.Build.targets fails the build if a csproj hardcodes a version over one of these.
+  -->
+  <PropertyGroup>
+    <NBenchmarkRoslynPin>4.8.0</NBenchmarkRoslynPin>
+    <NBenchmarkRoslynAnalyzersPin>3.11.0</NBenchmarkRoslynAnalyzersPin>
+  </PropertyGroup>
+
   <PropertyGroup>
     <!-- A new warning is a build break. NU1506 shipped across every project for months because
          nothing stopped it. -->
