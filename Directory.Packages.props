@@ -26,6 +26,6 @@
     <PackageVersion Include="NUnit.Analyzers" Version="4.14.0" />
     <PackageVersion Include="MSTest.TestFramework" Version="4.3.3" />
     <PackageVersion Include="MSTest" Version="4.3.3" />
-    <PackageVersion Include="MSTest.Analyzers" Version="4.3.3" />
+    <PackageVersion Include="MSTest.Analyzers" Version="4.4.0" />
   </ItemGroup>
 </Project>
