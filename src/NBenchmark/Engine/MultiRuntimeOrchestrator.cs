@@ -81,8 +81,15 @@ internal static class MultiRuntimeOrchestrator
         using var process = new Process { StartInfo = psi };
         process.Start();
 
+        // Both pipes are drained, and drained *before* the wait. Redirecting a stream and then not
+        // reading it hands the child a pipe that fills and never empties: the child blocks on its
+        // next write and WaitForExitAsync never returns. Windows sizes that buffer at 4 KB against
+        // Linux's 64 KB, so the same code deadlocks there and passes here - and `dotnet build` at
+        // `-v quiet` still writes to stdout the moment there is a warning to report.
+        var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
         var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
         await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        await stdoutTask.ConfigureAwait(false);
         var stderr = await stderrTask.ConfigureAwait(false);
 
         return (process.ExitCode, stderr);

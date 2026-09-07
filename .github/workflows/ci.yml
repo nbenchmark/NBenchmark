@@ -13,15 +13,50 @@ jobs:
     # leaves two thirds of that untested, for a library whose whole claim is accurate measurement.
     name: Build and Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    # Without a ceiling a wedged worker pipe sits on GitHub's 360-minute default, which is six
+    # hours of a runner to learn one test hung. Ubuntu and macOS finish inside ten minutes and
+    # Windows inside forty once the framework fan-out and Defender are dealt with, so this is a
+    # stuck-job guard with a wide margin, not a budget.
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          # The three-framework sweep runs once, on the fastest runner. What the other two rows
+          # exist for is the platform-conditional code - thread affinity, process priority, core
+          # topology, the macOS quality-of-service call - and none of that varies by target
+          # framework, so running them against net10.0 alone loses no coverage. It does remove two
+          # thirds of the isolation suite's process launches, which is where the Windows job's time
+          # actually goes: 386 of the 2106 tests in NBenchmark.Tests each spawn a `dotnet exec`
+          # measurement worker plus a WorkerPrewarm background refill, so a framework is roughly
+          # 770 process starts - cheap on Linux, and the single most expensive thing a Windows
+          # runner does.
+          - os: ubuntu-latest
+            test-frameworks: ""
+          - os: windows-latest
+            test-frameworks: "--framework net10.0"
+          - os: macos-latest
+            test-frameworks: "--framework net10.0"
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      # Defender scans every newly launched image and its dependency closure, which on this repo
+      # means it re-inspects the worker's framework closure on each of ~770 `dotnet exec` starts on
+      # a 4-vCPU VM. Excluding the workspace and the SDK is the difference between seconds and
+      # minutes per launch. The runner account is an administrator, so this needs no elevation.
+      - name: Exclude the build tree from Defender
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Add-MpPreference -ExclusionPath "${{ github.workspace }}"
+          Add-MpPreference -ExclusionPath "$env:USERPROFILE\.nuget"
+          Add-MpPreference -ExclusionPath "$env:ProgramFiles\dotnet"
+          Add-MpPreference -ExclusionProcess "dotnet.exe"
+          Add-MpPreference -ExclusionProcess "MSBuild.exe"
+          Add-MpPreference -ExclusionProcess "VBCSCompiler.exe"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
@@ -45,8 +80,24 @@ jobs:
       - name: Build solution
         run: dotnet build --no-restore --configuration Release
 
+      # The TRX is the record of where the time went. A job that has to be killed leaves no summary
+      # at all, and "Windows is slow" is not a finding you can act on without per-test durations.
+      # No LogFileName: eight test assemblies share one results directory, and a fixed name means
+      # each one overwrites the last, leaving a single project's timings to show for the run.
       - name: Run tests
-        run: dotnet test --no-build --configuration Release --verbosity normal
+        run: >
+          dotnet test --no-build --configuration Release --verbosity normal
+          ${{ matrix.test-frameworks }}
+          --logger trx
+          --results-directory ${{ github.workspace }}/TestResults
+
+      - name: Upload test timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}
+          path: TestResults/**/*.trx
+          if-no-files-found: warn
 
   samples:
     # Every sample, built and *run*. Building them is already covered by the job above - they are in
