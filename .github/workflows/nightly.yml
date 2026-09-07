@@ -1,0 +1,237 @@
+name: Nightly
+
+# Where the two slowest jobs in the repository live. Both are worth running and neither is worth
+# waiting for on every push, and both are skipped on nights when the default branch has not moved
+# since this workflow last passed, so a quiet week costs nothing.
+#
+# `windows-full` is the only Windows coverage there is. ci.yml runs Linux and macOS on every push
+# and no longer touches Windows, because the cost is not the tests but the process starts: the
+# isolation suite spawns a `dotnet exec` measurement worker per test, and process creation is the
+# one operation where Windows is not within a small constant of Linux. That put the push-path
+# Windows job at up to two hours against ten minutes for the other two. It moved here whole rather
+# than trimmed - every test, every framework, nothing filtered - because what Windows uniquely
+# covers is worth having: three kernel32 interop signatures nothing else exercises, the
+# Windows-only thread-priority branch, and pipe semantics that differ from POSIX in both buffer
+# size and handle inheritance, which is the shape of bug this architecture is most exposed to.
+#
+# `samples` runs every sample for real, which takes about ten minutes because measuring real code
+# is the entire point of a sample. Behind `needs: build` in ci.yml that ten minutes was serial
+# after the test matrix, so it set the floor on the whole push pipeline at twenty.
+#
+# What both trades cost: a break in either surfaces within a day rather than at the commit that
+# caused it, is attributable to a range of commits rather than one, and blocks no merge.
+
+on:
+  schedule:
+    # 03:37 AEST. Deliberately off the hour: scheduled runs queue behind everyone else's, and the
+    # top of the hour is where the whole world puts its crons.
+    - cron: "37 17 * * *"
+
+  # So the gap can be closed on demand - before a release, or after a change that touches the worker
+  # protocol. A manual run always executes, whether the branch has moved or not.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # For the run-history query below. Declared explicitly because a repository or organisation that
+  # narrows the default token would otherwise fail this at the API call rather than at review.
+  actions: read
+
+jobs:
+  # Answers one question, once, for both jobs below: has the default branch moved since this
+  # workflow last passed? Comparing against the last *successful* run, rather than the last run or a
+  # fixed 24-hour window, is what makes this self-correcting. A night that fails re-runs the next
+  # night instead of being written off, and a night GitHub drops - scheduled runs are best-effort
+  # and get dropped under load - does not silently skip whatever landed during it, because the
+  # comparison is to a commit rather than to a clock.
+  #
+  # One gate for both jobs means a failure in either re-runs both the following night. Worth it for
+  # having one place the decision is made, and for the two of them agreeing on which commit they
+  # last vouched for.
+  changes:
+    name: Has anything changed?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      should-run: ${{ steps.check.outputs.should-run }}
+    steps:
+      - name: Compare HEAD against the last successful run
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Referenced by filename rather than by numeric id, which is not knowable from inside the
+          # workflow and would not survive the file being recreated.
+          WORKFLOW: nightly.yml
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Started by hand - running regardless of what has changed."
+            echo "should-run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # The branch is github.ref_name rather than anything out of the event payload: a
+          # scheduled run's payload is minimal and cannot be relied on to carry the default branch,
+          # and a schedule only ever runs on the default branch, so ref_name already is it.
+          #
+          # `|| true`, and the empty-string default, because every reason this can come back without
+          # a SHA means the same thing: run. There is no successful run yet, the history has aged
+          # out, or the API is briefly unavailable. Erring towards a wasted nightly is the cheap
+          # mistake; erring towards a silent skip is the expensive one.
+          last=$(gh api \
+            "repos/${{ github.repository }}/actions/workflows/${WORKFLOW}/runs?status=success&branch=${{ github.ref_name }}&per_page=1" \
+            --jq '.workflow_runs[0].head_sha // ""' 2>/dev/null || true)
+
+          echo "Last successful run: ${last:-<none>}"
+          echo "Current HEAD:        ${{ github.sha }}"
+
+          if [ -n "$last" ] && [ "$last" = "${{ github.sha }}" ]; then
+            echo "should-run=false" >> "$GITHUB_OUTPUT"
+            echo "The branch has not moved since that run. Nothing to test."
+            echo "Skipped: no new commits since the last successful nightly (${last})." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "should-run=true" >> "$GITHUB_OUTPUT"
+            echo "The branch has moved. Running the full Windows suite and every sample."
+          fi
+
+  windows-full:
+    name: Full Suite (windows-latest)
+    needs: changes
+    if: needs.changes.outputs.should-run == 'true'
+    runs-on: windows-latest
+    # Three frameworks and the whole suite on the slowest platform for it, so a wide ceiling. This
+    # is the configuration that once ran for two hours before the Defender exclusions below; the
+    # point of the number is that it stops, not that it is tight.
+    timeout-minutes: 120
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # The single biggest lever on this job. Defender scans every newly launched image and its
+      # dependency closure, and the full suite is several hundred `dotnet exec` worker starts per
+      # framework on a 4-vCPU VM.
+      - name: Exclude the build tree from Defender
+        shell: pwsh
+        run: |
+          Add-MpPreference -ExclusionPath "${{ github.workspace }}"
+          Add-MpPreference -ExclusionPath "$env:USERPROFILE\.nuget"
+          Add-MpPreference -ExclusionPath "$env:ProgramFiles\dotnet"
+          Add-MpPreference -ExclusionProcess "dotnet.exe"
+          Add-MpPreference -ExclusionProcess "MSBuild.exe"
+          Add-MpPreference -ExclusionProcess "VBCSCompiler.exe"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build solution
+        run: dotnet build --no-restore --configuration Release
+
+      # No --framework and no --filter: the two things the push job trims are the whole reason this
+      # job exists.
+      - name: Run every test on every framework
+        run: >
+          dotnet test --no-build --configuration Release --verbosity normal
+          --logger trx
+          --results-directory ${{ github.workspace }}/TestResults
+
+      - name: Upload test timings
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-windows-test-results
+          path: TestResults/**/*.trx
+          if-no-files-found: warn
+
+  samples:
+    # Every sample, built and *run*. Building them is already covered by the job above - they are in
+    # the solution - so what this adds is that they still work: a sample is the shortest path from
+    # the README to a wrong impression, and one that throws on startup after an API change looks
+    # exactly like one that does not until something executes it. `samples/CrossClassSignificance`
+    # spent an epoch outside the solution for want of a step like this.
+    #
+    # Ubuntu only. The samples measure real code, so the wall-clock cost is the point of the
+    # exercise rather than something to pay three times over; the platform-conditional code they
+    # would exercise is already covered by ci.yml's matrix.
+    #
+    # Self-contained: it builds the solution itself rather than depending on another job, which is
+    # what let it move here unchanged.
+    name: Run Samples
+    needs: changes
+    if: needs.changes.outputs.should-run == 'true'
+    runs-on: ubuntu-latest
+    # Eighteen samples with a 900s guard each. The ceiling is what stops a wedged one sitting on
+    # GitHub's 360-minute default; the per-sample guard below is the one that localises the blame.
+    timeout-minutes: 45
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Build samples
+        run: dotnet build --configuration Release
+
+      - name: Run every sample
+        run: |
+          set -euo pipefail
+          failed=()
+          for project in samples/*/*.csproj; do
+            name=$(basename "$(dirname "$project")")
+
+            # A multi-targeted sample - the multi-runtime ones, and Telemetry - refuses to run
+            # without a framework, so pick the newest it builds for. The point of those samples is
+            # what they measure across runtimes, which they do by launching the others themselves.
+            framework=()
+            if grep -q "<TargetFrameworks>" "$project"; then
+              framework=(--framework net10.0)
+            fi
+
+            echo "::group::$name"
+            # A stuck-sample guard, not a budget. The slowest sample is a multi-runtime one, which
+            # builds and launches a worker per runtime before it measures anything and still lands
+            # under a minute; the whole set runs in about ten, which is why it is a nightly.
+            if timeout 900 dotnet run --project "$project" "${framework[@]}" --configuration Release --no-build; then
+              echo "$name ok"
+            else
+              echo "$name FAILED with exit code $?"
+              failed+=("$name")
+            fi
+            echo "::endgroup::"
+          done
+          if [ ${#failed[@]} -ne 0 ]; then
+            echo "Samples that did not complete: ${failed[*]}"
+            exit 1
+          fi
