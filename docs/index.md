@@ -23,7 +23,7 @@ result.Print();
 
 - **No setup.** Use one static call. You don't need attributes, a specific class structure, or a dedicated project.
 - **No guessing.** Warmup, batch size, and sample count resolve automatically.
-- **Clean processes by default.** Results reflect your code rather than the history of your process.
+- **Worker process by default.** Results reflect your code rather than the history of the host process.
 - **Real statistics.** Use confidence intervals and significance testing instead of simple averages.
 - **Zero dependencies.** The core package uses only the BCL.
 
@@ -90,22 +90,22 @@ All harness CLI flags pass through. For more information, see [Global tool](./us
 
 ## Features
 
-| Feature | Description | Link |
+| Feature | Description | Docs |
 | --- | --- | --- |
-| Isolated runs | Measures in a fresh worker process to prevent earlier work from biasing the numbers. On by default. | [→](./features/isolated-runs.md) |
-| Parameterized benchmarks | Runs one body across many input values to show how it scales. | [→](./features/parameterized-suite.md) |
-| Categories | Tags benchmarks to include or exclude groups from a run. | [→](./features/categories.md) |
-| Multi-runtime | Runs the same benchmarks on .NET 8, .NET 9, and .NET 10 side-by-side. | [→](./features/multi-runtime.md) |
-| Multiple launches | Repeats a benchmark in separate processes to measure run-to-run variance. | [→](./features/multiple-launches.md) |
-| Environment control | Pins CPU affinity and process priority for the process and measuring thread to reduce noise. | [→](./features/environment-control.md) |
-| Host drift canary | Times fixed control work between benchmarks to detect if the machine drifted mid-run. On by default. | [→](./statistics/measurement.md#the-host-drift-canary) |
-| Interference rejection | Discards samples that the OS preempted using the measuring thread's CPU occupancy. On by default. | [→](./statistics/outliers.md#evidence-based-interference-rejection) |
-| Performance gates | Fails xUnit, NUnit, or MSTest tests on regression. | [→](./test-integration/index.md) |
-| CI regression gate | Fails the run when a benchmark regresses past a specified percentage. | [→](./reference/cli.md) |
-| Diagnostics | Records GC counts, heap state, exceptions, and CPU time per operation. | [→](./statistics/diagnostics.md) |
-| Live telemetry | Streams per-sample events to an observer or to OpenTelemetry. | [→](./reference/observers.md) |
-| Compile-time analysis | Catches benchmark authoring mistakes as build-time diagnostics. | [→](./reference/analyzers.md) |
-| Pluggable statistics | Allows you to swap in your own outlier detector or significance test. | [→](./guides/custom-statistics.md) |
+| Isolated runs | Measures in a fresh worker process to prevent earlier work from biasing the numbers. On by default. | [Docs](./features/isolated-runs.md) |
+| Parameterized benchmarks | Runs one body across many input values to show how it scales. | [Docs](./features/parameterized-suite.md) |
+| Categories | Tags benchmarks to include or exclude groups from a run. | [Docs](./features/categories.md) |
+| Multi-runtime | Runs the same benchmarks on .NET 8, .NET 9, and .NET 10 side-by-side. | [Docs](./features/multi-runtime.md) |
+| Multiple launches | Repeats a benchmark in separate processes to measure run-to-run variance. | [Docs](./features/multiple-launches.md) |
+| Environment control | Pins CPU affinity and process priority for the process and measuring thread to reduce noise. | [Docs](./features/environment-control.md) |
+| Host drift canary | Times fixed control work between benchmarks to detect if the machine drifted mid-run. On by default. | [Docs](./statistics/measurement.md#the-host-drift-canary) |
+| Interference rejection | Discards samples that the OS preempted using the measuring thread's CPU occupancy. On by default. | [Docs](./statistics/outliers.md#evidence-based-interference-rejection) |
+| Performance gates | Fails xUnit, NUnit, or MSTest tests on regression. | [Docs](./test-integration/index.md) |
+| CI regression gate | Fails the run when a benchmark regresses past a specified percentage. | [Docs](./reference/cli.md) |
+| Diagnostics | Records GC counts, heap state, exceptions, and CPU time per operation. | [Docs](./statistics/diagnostics.md) |
+| Live telemetry | Streams per-sample events to an observer or to OpenTelemetry. | [Docs](./reference/observers.md) |
+| Compile-time analysis | Catches benchmark authoring mistakes as build-time diagnostics. | [Docs](./reference/analyzers.md) |
+| Pluggable statistics | Allows you to swap in your own outlier detector or significance test. | [Docs](./guides/custom-statistics.md) |
 
 ## Built on real statistics
 

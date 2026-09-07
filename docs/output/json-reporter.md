@@ -58,7 +58,7 @@ When you provide an explicit `fileName`, subsequent calls to `ReportAsync` overw
 
 ## Output format
 
-The envelope begins with `schemaVersion` and `measurementEpoch`. For more information, see [Report format versioning](./index.md#report-format-versioning) before diffing two files.
+The envelope begins with `schemaVersion` and `measurementEpoch`. Before diffing two files, see [Report format versioning](./index.md#report-format-versioning).
 
 ```json
 {
@@ -163,7 +163,7 @@ When `tailMetricsBasis` is `raw`:
 - The core statistics (`mean`, `median`, `standardDeviation`, `coefficientOfVariation`, and `sampleCount`) describe the **trimmed (inlier)** set.
 - The precision metrics (`standardError` and `marginOfError`) are hybrid. They describe the precision of the trimmed mean but are computed [Winsorized](../statistics/descriptive.md#winsorized-standard-error-for-trimmed-data) over the pre-trim set. This ensures that the samples removed by the outlier fence still count as observations.
 
-This distinction is deliberate because the outlier fence removes exactly the slow tail that `P99` and `MaxNs` are designed to describe. See [Descriptive statistics](../statistics/descriptive.md) for more information. When displaying both sets of metrics, you should label them clearly; the `outlierDetector` field names the detector that separated the two.
+This distinction is deliberate because the outlier fence removes exactly the slow tail that `P99` and `MaxNs` are designed to describe. For more information, see [Descriptive statistics](../statistics/descriptive.md). When displaying both sets of metrics, you should label them clearly; the `outlierDetector` field names the detector that separated the two.
 
 ### The `autoTune` object
 
@@ -187,7 +187,7 @@ Note two limitations:
 1. NBenchmark collects **aggregate decay**, not per-method tier attribution. To identify individual methods and their tiers, use the runtime's `MethodLoadVerbose` events via EventPipe or an in-process `EventListener`.
 2. Ops-per-sample calibration runs before warmup and exercises the body. Therefore, some tier-up typically occurs before the first warmup batch is recorded. The curve shows remaining tiering, cache warming, and branch-predictor warming, rather than the full cold-start cliff.
 
-The `clockResolutionNs` is the **measured** effective resolution of the timer, not `Stopwatch.Frequency`. For example, Apple Silicon may report 1 ns for frequency, but the counter steps in 41.667 ns units. `targetSampleDurationNs` is the duration target resolved against the measured resolution to span `AutoTune.MinQuantaPerSample` steps; `sampleDurationNs` is the actual duration of one sample.
+The `clockResolutionNs` is the **measured** effective resolution of the timer, not `Stopwatch.Frequency`. For example, on Apple Silicon `Stopwatch.Frequency` reports 1 GHz (1 ns per tick), but the counter advances in 41.667 ns steps. `targetSampleDurationNs` is the duration target resolved against the measured resolution to span `AutoTune.MinQuantaPerSample` steps; `sampleDurationNs` is the actual duration of one sample.
 
 The `sampleQuantizationFraction` is one clock step as a fraction of one sample. This represents the granularity floor of the measurement. If the `marginOfError` is well below this fraction, the result describes the clock's step grid rather than the code. A margin of ±0.03% next to a median that shifts 0.5% on re-run is a typical signature of this effect. See [Timer resolution](../statistics/measurement.md#timer-resolution).
 
@@ -195,7 +195,7 @@ The `jitLastChangeAtNs` field records how far into warmup the JIT last compiled 
 
 `totalDuration` is the end-to-end wall-clock time (warmup + pre-measure GC + measured loop), while `measuredDuration` is the measured loop only. The gap is primarily composed of warmup samples and the pre-measure `GC.Collect`.
 
-The `detail` and `profile` fields in the envelope report the active detail level (`simple`, `standard`, or `advanced`) and GC behavior. The result records always contain all available fields regardless of the detail level.
+The `detail` and `gcBehavior` fields in the envelope report the active detail level (`simple`, `standard`, or `advanced`) and GC behavior. The result records always contain all available fields regardless of the detail level.
 
 ## Notes
 

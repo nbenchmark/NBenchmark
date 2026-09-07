@@ -33,7 +33,7 @@ All instrument and tag names use the `nbenchmark.*` namespace for OpenTelemetry 
 NBenchmark emits nested `Activity` spans that render the autotune lifecycle as a flame-graph-shaped trace:
 
 ```text
-benchmark.suite                      the coordinator
+benchmark.suite                      the host process
   └── nbenchmark.worker              one per measuring process; absent in an --in-process run
         └── benchmark.run
               ├── nbenchmark.phase.jitter
@@ -43,7 +43,7 @@ benchmark.suite                      the coordinator
 ```
 
 - `benchmark.suite` (root): Created at `OnSuiteStarting`. Tags include `nbenchmark.suite.name`, `nbenchmark.suite.benchmark_count`, `nbenchmark.profile`, `nbenchmark.runtime`, `nbenchmark.seed`, and `nbenchmark.run_order`. It stops at `OnSuiteCompleted` with `nbenchmark.suite.result_count`.
-- `nbenchmark.worker` (per measuring process): Opened as a worker's session begins. It is parented to the coordinator's span through the `TRACEPARENT` it inherited and is tagged with `nbenchmark.worker.pid` plus the run's resource attributes. This span ensures an isolated run appears as a single trace rather than one trace per process, and it renders worker startup as the gap before the first phase. An `--in-process` run has no such process or span.
+- `nbenchmark.worker` (per measuring process): Opened as a worker's session begins. It is parented to the host process's span through the `TRACEPARENT` it inherited and is tagged with `nbenchmark.worker.pid` plus the run's resource attributes. This span ensures an isolated run appears as a single trace rather than one trace per process, and it renders worker startup as the gap before the first phase. An `--in-process` run has no such process or span.
 - `benchmark.run` (per-benchmark): Created at `OnBenchmarkRunStarting`. Tags include `nbenchmark.name`, `nbenchmark.class`, `nbenchmark.baseline`, and `nbenchmark.parameter_set`. It stops at `OnBenchmarkRunCompleted` with `nbenchmark.result.median_ns`, `nbenchmark.result.mean_ns`, `nbenchmark.result.sample_count`, and `nbenchmark.result.outliers_removed`.
 
 ### Phase spans
@@ -67,7 +67,7 @@ Span events are discrete annotations on a phase span that explain why a phase en
 
 | Event | Parent span | Fired when | Key tags |
 | --- | --- | --- | --- |
-| `detector.switched` | `nbenchmark.phase.jitter` | The outlier detector auto-switched IQR $\rightarrow$ MAD | `nbenchmark.from`, `nbenchmark.to`, `nbenchmark.jitter_metric` |
+| `detector.switched` | `nbenchmark.phase.jitter` | The outlier detector auto-switched IQR -> MAD | `nbenchmark.from`, `nbenchmark.to`, `nbenchmark.jitter_metric` |
 | `warmup.plateau_reached` | `nbenchmark.phase.warmup` | Warmup stopped because the body settled (plateau rule) | - |
 | `measurement.ci_target_met` | `nbenchmark.phase.measurement` | Measurement stopped because the CI half-width target was met | `nbenchmark.achieved_ci_width`, `nbenchmark.ci_target` |
 | `phase.cap_hit` | `nbenchmark.phase.warmup` / `nbenchmark.phase.measurement` | A phase ended early at the wall-clock tuning cap | - |
@@ -97,7 +97,7 @@ await BenchmarkHarness.Create(args)
     .RunAsync();
 ```
 
-The package manages the OpenTelemetry SDK, subscribes it to the `NBenchmark` `Meter` and `ActivitySource`, applies histogram buckets suited to per-op durations, and flushes when the run ends. Crucially, it does this in the harness **and inside every isolated worker process**.
+The package manages the OpenTelemetry SDK, subscribes it to the `NBenchmark` `Meter` and `ActivitySource`, applies histogram buckets suited to per-op durations, and flushes when the run ends - in the harness **and inside every isolated worker process**, which is the part that is difficult to wire by hand.
 
 If no endpoint is configured (via command line, code, or `OTEL_EXPORTER_OTLP_ENDPOINT`), the exporter declines to build and nothing connects. Referencing the package alone does not request an export.
 
@@ -171,7 +171,7 @@ CI-sourced values take precedence over the git CLI fallback.
 | `nbenchmark.host.machine_name` | `Environment.MachineName` |
 | `nbenchmark.host.os` | `windows`, `macos`, or `linux` |
 | `nbenchmark.host.arch` | `arm64`, `x64`, `x86`, etc. |
-| `nbenchmark.host.runtime` | `RuntimeInformation.FrameworkDescription` (e.g., `.NET 8.0.22`) |
+| `nbenchmark.host.runtime` | `RuntimeInformation.FrameworkDescription` (such as `.NET 8.0.22`) |
 
 ### OpenTelemetry-standard env vars
 
@@ -203,7 +203,7 @@ An SDK constructed in your `Main` method is in the wrong process. Because phase 
 | `OTEL_RESOURCE_ATTRIBUTES` | Resource attributes (passed through) |
 | `OTEL_SERVICE_NAME` | Service name (passed through) |
 | `NBENCHMARK_OTEL_ENDPOINT` | NBenchmark-specific endpoint mirror |
-| `TRACEPARENT` | W3C trace context of the coordinator's span, allowing worker spans to join the run's trace |
+| `TRACEPARENT` | W3C trace context of the host process's span, allowing worker spans to join the run's trace |
 
 If `NBENCHMARK_OTEL_ENDPOINT` is set and `OTEL_EXPORTER_OTLP_ENDPOINT` is not, NBenchmark applies the mirror so that the SDK picks it up.
 
@@ -217,9 +217,9 @@ The harness mirrors this into `OTEL_EXPORTER_OTLP_ENDPOINT` before spawning isol
 
 ### Observer forwarding
 
-Auto-attached observers fire in both the worker and the coordinator. The worker resolves the `ObserverRegistry` auto-attach list once per session.
+Auto-attached observers fire in both the worker and the host process. The worker resolves the `ObserverRegistry` auto-attach list once per session.
 
-Explicit observers (via `--observer <name>`) are **not** forwarded to workers; they fire in the coordinator only. Programmatic observers (`WithObserver`) are live objects and cannot cross the process boundary; the coordinator replays the event stream into your instance.
+Explicit observers (via `--observer <name>`) are **not** forwarded to workers; they fire in the host process only. Programmatic observers (`WithObserver`) are live objects and cannot cross the process boundary; the host process replays the event stream into your instance.
 
 ### Topology
 
@@ -233,7 +233,7 @@ Isolated / CI:
   Collector -> Grafana / Jaeger / Honeycomb
 ```
 
-Both modes produce a single trace and look identical to a dashboard.
+In-process and isolated runs both produce a single trace and look identical on a dashboard.
 
 ## See also
 

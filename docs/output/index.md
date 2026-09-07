@@ -135,12 +135,12 @@ Every file-writing reporter stamps its output with two independent numbers. Thes
 | `schemaVersion` | Determines if a parser can still read the file. | A field is renamed, removed, or changes type; or the envelope is restructured. Added fields do not trigger a bump. |
 | `measurementEpoch` | Determines if numbers from different runs are comparable. | NBenchmark changes what a benchmark reports, such as harness overhead, the default runtime profile, or the definition of a reported statistic. |
 
-The current schema version is `1` and the measurement epoch is `7`. These versions move independently. For example, replacing the boxing dispatch path with typed delegates moved the calibration standard from **9.34 ns / 24 B per op to 2.53 ns / 0 B** while leaving the JSON shape identical. A schema version alone would not indicate this change, and a dashboard would report a 3.7x improvement that was not earned by application code.
+The current schema version is `2` and the measurement epoch is `7`. These versions move independently. For example, replacing the boxing dispatch path with typed delegates moved the calibration standard from **9.34 ns / 24 B per op to 2.53 ns / 0 B** while leaving the JSON shape identical. A schema version alone would not indicate this change, and a dashboard would report a 3.7x improvement that was not earned by application code.
 
 Stamps appear in these locations:
 
 - **JSON**: `schemaVersion` and `measurementEpoch` are the first two fields of the envelope, allowing consumers to check compatibility before parsing the rest of the file.
-- **CSV**: `SchemaVersion` and `MeasurementEpoch` are columns alongside `Detail`, `Profile`, `RuntimeProfile`, and `RuntimeKnobs`.
+- **CSV**: `SchemaVersion` and `MeasurementEpoch` are columns alongside `Detail`, `GcBehavior`, `RuntimeProfile`, and `RuntimeKnobs`.
 - **Markdown**: A `> Format:` line appears in the header block.
 
 ### Consuming stamps

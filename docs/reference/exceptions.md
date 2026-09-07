@@ -41,7 +41,7 @@ A configuration failure is deterministic: the same program fails the same way on
 
 `BenchmarkIsolationException` carries the refusal as data, so a test adapter or a CI reporter can act on it without parsing the message:
 
-- `Status` is the `IsolationStatus` naming why the measurement did not happen in a worker. When several benchmarks are refused at once, it is the first offender's and the message lists every one.
+- `Status` is the `IsolationStatus` naming why the measurement did not happen in a worker. When several benchmarks are refused at once, it is the first offender's status, and the message lists every one.
 - `Remedy` is what to change so the benchmark can be isolated, or `null` when the status has no remedy - the host process was asked for deliberately, for example.
 
 Both also appear in `Message`. For the statuses and their remedies, see [Isolated runs](../features/isolated-runs.md).

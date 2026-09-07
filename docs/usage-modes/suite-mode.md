@@ -275,7 +275,7 @@ Errored benchmarks have `result.Errored == true` and a message in `result.ErrorM
 - [Parameterized benchmarks: Suite mode](../features/parameterized-suite.md) - Run benchmarks across multiple input values
 - [Multi-runtime comparison](../features/multi-runtime.md) - Compare across .NET runtimes
 - [Multiple launches](../features/multiple-launches.md) - Measure run-to-run variance
-- [Isolated runs](../features/isolated-runs.md) - Run in a clean worker
+- [Isolated runs](../features/isolated-runs.md) - Run in a worker process
 - [Harness mode: BenchmarkHarness](./harness-mode.md) - Attribute-based discovery and CLI control
 - [Configuration](../reference/configuration.md) - Full options reference
 - [Reporters](../output/index.md) - All available reporters

@@ -86,7 +86,7 @@ var result = Benchmark.Run(() => int.Parse("12345"));
 result.Print();
 ```
 
-## Compare two implementations
+## Compare implementations
 
 Use `BenchmarkSuite` to compare multiple approaches side-by-side:
 

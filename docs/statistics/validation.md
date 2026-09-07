@@ -43,7 +43,7 @@ By using arbitrary inputs instead of a few hand-picked arrays, this layer provid
 | `KruskalWallis.Test` (H, p) | `scipy.stats.kruskal` (with tie correction) | $H \le$ 1e-9; $p \le$ 1e-6 |
 | `WinsorizedError.Compute` | Yuen's formula / R's `WRS2::trimse` | $\le$ 1e-9 relative |
 
-Reference values are generated using the following Python logic:
+The following Python logic generates the reference values:
 
 ```python
 import numpy as np
@@ -95,5 +95,5 @@ Because a CPU-bound busy-wait has a hard floor and preemption only adds time, th
 ## Limitations of assertions
 
 Some metrics are not asserted against an exact ground truth:
-- **Allocation tracking** is treated as a smoke test (e.g., a 64 KiB allocation must report $\ge$ 1 KiB) rather than an exact byte comparison, as framework allocations can occur between counter reads.
+- **Allocation tracking** is treated as a smoke test (for example, a 64 KiB allocation must report $\ge$ 1 KiB) rather than an exact byte comparison, as framework allocations can occur between counter reads.
 - **Absolute timing accuracy** depends on the platform's `Stopwatch` resolution and the OS scheduler; timing tests bound this coarsely rather than precisely.

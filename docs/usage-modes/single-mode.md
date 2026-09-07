@@ -20,7 +20,7 @@ var result = Benchmark.Run(() =>
 });
 ```
 
-`Benchmark.Run` warms up the code until the timings plateau and collects measured samples until the confidence interval is sufficiently tight. It then trims outliers using the IQR fence rule and returns a `BenchmarkResult`.
+`Benchmark.Run` warms up the code until the timings plateau and collects measured samples until the confidence interval is sufficiently tight. It then trims outliers using the IQR fence rule and returns a `BenchmarkResult`. For more information, see [Outlier trimming](../statistics/outliers.md).
 
 ## Overloads
 

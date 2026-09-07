@@ -71,7 +71,7 @@ Allocation statistics are computed from the **raw, untrimmed** sample set. Timin
 
 `AllocatedBytesMean` is `null` if tracking is disabled or the benchmark errors; the other three are absent unless the run produced statistics.
 
-A **Median of 0 with a non-zero mean and a large max** typically indicates that most operations allocate nothing, but a minority allocate significantly. This is a common signature of growing buffers, cache-miss paths, or lazily initialized fields.
+A **median of 0 with a non-zero mean and a large max** typically indicates that most operations allocate nothing, but a minority allocate significantly. This is a common signature of growing buffers, cache-miss paths, or lazily initialized fields.
 
 At Advanced detail, the breakdown appears under the benchmark:
 

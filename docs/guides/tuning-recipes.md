@@ -164,7 +164,7 @@ dotnet run -- --gc per-sample-collect
 
 ## Debugging unstable results
 
-**When to use**: Use this recipe when your benchmark produces widely different numbers across runs, the error column is large, or you see a bimodal-distribution warning.
+**When to use**: Use this recipe when your benchmark produces widely different numbers across runs, the Error column is large, or you see a bimodal-distribution warning.
 
 **Recommended settings**:
 
@@ -199,7 +199,7 @@ dotnet run -- --diagnostics all --outlier mad --detail advanced --launch-count 5
 - **GC correlation**: If GC collection counts correlate with slow samples, GC pressure is affecting timings. Try using `--gc per-sample-collect`.
 - **Bimodal-distribution warning**: Investigate the cause (such as lock contention, cache misses, or GC pauses) rather than silencing the warning.
 - **Confirmed preemption**: If samples are "confirmed preempted by the OS," the host is too noisy to trust. This is detected via [evidence-based interference rejection](../statistics/outliers.md#evidence-based-interference-rejection).
-- **Interference disabled**: If `autoTune.interferenceDisabledReason` is set, the filter could not run (e.g., unsupported platform or async body). Timings are unaffected, but OS-preemption evidence is unavailable.
+- **Interference disabled**: If `autoTune.interferenceDisabledReason` is set, the filter could not run (for example, an unsupported platform or an async body). Timings are unaffected, but OS-preemption evidence is unavailable.
 - **Host-drift warning**: Indicates the machine speed moved significantly between the row and the baseline. See [The host drift canary](../statistics/measurement.md#the-host-drift-canary).
 - **Trimmed fraction**: A high `outliersRemoved` fraction indicates the fence removed many samples. This is reflected in the Error column as a wider margin. See [discarded samples](../statistics/outliers.md).
 

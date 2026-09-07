@@ -11,7 +11,7 @@ order: 7
 NBenchmark provides built-in outlier trimming (using an IQR fence by default, or MAD on noisy hosts) and significance testing (using Mann-Whitney U for two groups and Kruskal-Wallis for three or more). While these are designed for general-purpose benchmarking, they may not fit every domain:
 
 - **Latency SLOs**: Service Level Objectives often care about the tail of the distribution rather than the mean. Trimming slow samples before computing statistics hides the exact values a latency budget needs to monitor.
-- **Fixed physical thresholds**: Some requirements specify that any sample above a certain limit (e.g., 1 ms) is a stall. These fixed thresholds do not adapt to the data's spread like an IQR fence does.
+- **Fixed physical thresholds**: Some requirements specify that any sample above a certain limit (for example, 1 ms) is a stall. These fixed thresholds do not adapt to the data's spread like an IQR fence does.
 - **Domain-specific rules**: Some teams prefer comparing medians directly rather than using a distribution-based rank test, as it is simpler and more interpretable.
 - **Advanced comparisons**: You may require bootstrap or Bayesian comparisons to obtain a posterior over the difference rather than a single p-value.
 
@@ -133,10 +133,10 @@ new MeasurementOptions
 
 - **Custom statistics in isolated workers**: Strategies are passed to the worker either as a factory or a type name. If a strategy is passed as an instance with constructor arguments, the engine refuses to isolate the run because the instance cannot cross the process boundary. To resolve this, use a factory. In harness mode, scalar CLI overrides (such as samples, warmup, and confidence) are forwarded to each worker. For more information, see [Isolated runs](../features/isolated-runs.md#additional-details).
 
-- **Worker-side failures**: If a custom strategy fails inside the worker (e.g., because a required file is missing), the engine falls back to the built-in strategy rather than failing the entire run. The engine attaches a warning to each affected result naming the substitution and the reason for the failure.
+- **Worker-side failures**: If a custom strategy fails inside the worker (for example, because a required file is missing), the engine falls back to the built-in strategy rather than failing the entire run. The engine attaches a warning to each affected result naming the substitution and the reason for the failure.
 
 > [!TIP] Compose built-in strategies
-> Built-in strategies - such as `MannWhitneyUSignificanceTest`, `KruskalWallisSignificanceTest`, and `DefaultSignificanceTest` - all implement `ISignificanceTest`. You can wrap or compose these strategies to add a domain-specific gate on top of the standard result, or to fall back to a custom rule when a built-in test returns `NotTested` (e.g., due to too few samples).
+> Built-in strategies - such as `MannWhitneyUSignificanceTest`, `KruskalWallisSignificanceTest`, and `DefaultSignificanceTest` - all implement `ISignificanceTest`. You can wrap or compose these strategies to add a domain-specific gate on top of the standard result, or to fall back to a custom rule when a built-in test returns `NotTested` (for example, due to too few samples).
 
 ## Run the benchmark
 
@@ -162,7 +162,7 @@ The custom detector and test are named in the header and footer, ensuring the re
 
 The output format remains identical to standard runs. The custom detector and test only change which samples are kept and how significance is determined. For a full explanation of indicators and warnings, see [Reading Your Results](../getting-started/reading-your-results.md).
 
-One caveat: the `Magnitude` column reflects the value returned in `EffectSize.Magnitude`. The built-in tests use labels such as Negligible, Small, Medium, or Large. The console reporter color-codes results based on these conventional labels. To maintain this color coding, use `neg`, `small`, `med`, or `large`.
+One caveat: the `Magnitude` column reflects the value returned in `EffectSize.Magnitude`. The built-in tests use the `MagnitudeLabel` values `Negligible`, `Small`, `Medium`, and `Large`. The console reporter color-codes results based on these conventional labels, so use the `MagnitudeLabel` enum values to keep that color coding.
 
 ## Next steps
 

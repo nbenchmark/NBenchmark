@@ -31,7 +31,7 @@ public class SerializationTests
 }
 ```
 
-`PerformanceFact` discovers this test through the xUnit extensibility API. NBenchmark runs the method body as a benchmark (including warmup and measured samples) and compares the measured mean to `MaxMeanNs`. If the mean exceeds 500 $\mu$s, the test fails.
+`PerformanceFact` discovers this test through the xUnit extensibility API. NBenchmark runs the method body as a benchmark (including warmup and measured samples) and compares the measured mean to `MaxMeanNs`. If the mean exceeds 500 µs, the test fails.
 
 ## [PerformanceFact]
 

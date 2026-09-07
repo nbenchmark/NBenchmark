@@ -18,7 +18,7 @@ The engine does not read from `Stopwatch.Frequency` because that is an advertise
 
 The probe is used in three places:
 
-- `ResolveTargetSampleDurationNs` raises the Phase A sample-duration target to `resolution × MinQuantaPerSample`. This ensures quantization remains under 0.2% of a sample on every host rather than varying between them. This operation only increases the duration.
+- `ResolveTargetSampleDurationNs` raises the Phase A sample-duration target to `resolution × MinQuantaPerSample`. This ensures quantization remains under 0.2% of a sample on every host rather than varying between them. It only ever raises the target.
 - `QuantizationFraction` records one step as a fraction of one achieved sample on `AutoTuneDiagnostic.SampleQuantizationFraction`. This is computed from the achieved per-op mean multiplied by the final `K`, not the target, because `K` is a power of two and post-warmup recalibration may have shifted it.
 - `AdaptiveLoop.BuildClockResolutionWarning` issues a warning when the measured confidence interval (CI) half-width is more than `ClockResolutionWarningFactor` (2×) finer than the quantization floor.
 
@@ -46,7 +46,7 @@ With the default `MinQuantaPerSample` floor, this warning is rare. It primarily 
 
 ## Jitter calibration and detector auto-switch
 
-Phase 0 times a deterministic, allocation-free busy-weight loop to derive a robust jitter metric: the ratio of the median absolute deviation to the median (MAD / median) of its per-sample timings. This probes the host, not the code under test. A quiet dedicated host typically reports well below 0.05, while a shared-tenant CI runner typically reports 0.10-0.30. This metric is robust because both the median and MAD have a ~50% breakdown point, meaning a single JIT spike or preemption cannot distort it as they would for standard deviation or mean.
+Phase 0 times a deterministic, allocation-free busy-weight loop to derive a robust jitter metric: the ratio of the median absolute deviation to the median (MAD / median) of its per-sample timings. This probes the host, not the code under test. A quiet dedicated host typically reports well below 0.05, while a shared-tenant CI runner reports 0.10-0.30. This metric is robust because both the median and MAD have a ~50% breakdown point, meaning a single JIT spike or preemption cannot distort it as they would for standard deviation or mean.
 
 This metric is critical because the default outlier detector (IQR fence) uses the interquartile range as its scale estimate, which has a low breakdown point. A heavy tail of scheduling-preempted samples can distort the fence and cause the engine to trim the wrong values. Median absolute deviation (MAD) is far more resilient to such tails. When the jitter metric exceeds `AutoTune.JitterAutoSwitchThreshold` (default 0.10) and the user has not pinned an outlier detector, the engine automatically switches the detector from IQR fence to MAD for that run. The engine records this switch in the `AutoTune` diagnostic (`OutlierDetectorSwitched`) and emits a warning.
 

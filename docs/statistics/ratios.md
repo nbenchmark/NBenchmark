@@ -42,7 +42,7 @@ This approach has two consequences:
 | Console | `1.24x` - A `?` suffix and dim color indicate the interval spans `1.00x`. |
 | Markdown | A `Ratio CI` column, marked with ⚠️ when the interval spans `1.00x`. |
 | CSV | `RatioCiLower`, `RatioCiUpper`, and `RatioReplicates` columns. |
-| Advanced Detail | A `Ratio:` line in the per-benchmark stats block. |
+| Advanced detail | A `Ratio:` line in the per-benchmark stats block. |
 
 **An interval that spans `1.00x` means the run cannot distinguish between the two benchmarks**, regardless of where the point estimate sits. For example, a `1.35x` ratio with an interval of `0.82-2.24x` is not a 35% regression; it is a result that lacks sufficient replicates to be conclusive. To narrow the interval, increase the `--launch-count`.
 

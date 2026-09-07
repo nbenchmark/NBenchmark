@@ -16,7 +16,7 @@ There is none. The analyzers and their code fixes arrive inside the `NBenchmark`
 dotnet add package NBenchmark
 ```
 
-They ship this way on purpose. The mistakes these rules catch - a capturing body, a body with no observable side effect, a body the JIT can delete - all produce a number that looks perfectly reasonable, so an author who makes one has no reason to suspect anything is wrong. An analyzer nobody installed would never have told them.
+They ship this way because the mistakes these rules catch - a capturing body, a body with no observable side effect, a body the JIT can delete - all produce a number that looks perfectly reasonable, so an author who makes one has no reason to suspect anything is wrong. Shipping inside the package is what guarantees the diagnostic reaches that author.
 
 If you used the separate `NBenchmark.Analyzers` package, remove the `PackageReference`. The rule IDs, severities, and code fixes are unchanged.
 
@@ -30,7 +30,7 @@ If you used the separate `NBenchmark.Analyzers` package, remove the `PackageRefe
 | NB0004 | `[Benchmark]` body has no observable side effects | Error | A void `[Benchmark]` method body has no observable side effects, allowing the JIT to eliminate it. |
 | NB0005 | `[Benchmark]` body does no observable work | Error | A void `[Benchmark]` method has an empty body. |
 | NB0006 | Multiple `[Benchmark(Baseline = true)]` methods in the same class | Error | Only one benchmark per class can be the baseline. |
-| NB0007 | Duplicate lifecycle method in benchmark class | Error | Two methods share the same lifecycle attribute (e.g., `[GlobalSetup]`). |
+| NB0007 | Duplicate lifecycle method in benchmark class | Error | Two methods share the same lifecycle attribute (such as `[GlobalSetup]`). |
 | NB0008 | `[Benchmark]` property value out of range | Error | `Samples` or `WarmupSamples` on `[Benchmark]` is outside the valid range. |
 | NB0009 | `MeasurementOptions` property value out of range | Error | A property in a `MeasurementOptions` initializer is outside the valid range. |
 | NB0010 | Benchmark body is throwaway | Warning | A lambda passed to a `Benchmark.Run*` `Action` overload has no observable side effects. |
@@ -171,7 +171,7 @@ Each lifecycle attribute (`[GlobalSetup]`, `[GlobalTeardown]`, `[SampleSetup]`, 
 [GlobalSetup] public void InitAgain() { }
 ```
 
-### NB0008 / NB0009 - range violations
+### NB0008 / NB0009 - Range violations
 
 NBenchmark checks `[Benchmark]` attribute properties and `MeasurementOptions` values against their valid ranges at compile time to prevent `ArgumentOutOfRangeException` at runtime.
 
@@ -264,7 +264,7 @@ public void Sort(int size) { }
 static IEnumerable<(int Size, string Label)> SortCases() => ...
 ```
 
-Use one or the other. For small literal lists, use `[Arguments]`. For generated values or parameter sweeps, use `[ArgumentsSource]`. See [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md) for a full comparison.
+Use one or the other. For small literal lists, use `[Arguments]`. For generated values or parameter sweeps, use `[ArgumentsSource]`. For a full comparison, see [Parameterized benchmarks: Harness mode](../features/parameterized-harness.md).
 
 ### NB0013 - `PerClass` lifetime with mutable instance field
 
@@ -348,7 +348,7 @@ public class ProcessBenchmarks
 
 ## Runtime independence warning
 
-In addition to compile-time analyzers, NBenchmark emits a runtime warning on `BenchmarkResult.Warnings` when a class runs under `InstanceLifetime.PerClass` with multiple `[Benchmark]` methods but declares neither `IStateReset` nor `[SharedState]`. This covers cases where the analyzer is not installed or in suite mode.
+In addition to compile-time analyzers, NBenchmark emits a runtime warning on `BenchmarkResult.Warnings` when a class runs under `InstanceLifetime.PerClass` with multiple `[Benchmark]` methods but declares neither `IStateReset` nor `[SharedState]`. This warning also covers suite mode, where the analyzers' harness-mode assumptions do not apply.
 
 To opt out, declare `[SharedState]` on the class:
 

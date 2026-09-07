@@ -41,7 +41,7 @@ NBenchmark records the basis used on the result as `BenchmarkResult.TailMetricsB
 > [!IMPORTANT] Percentiles describe samples, and a sample may be a batch
 > When [ops-per-sample calibration](./measurement.md#phase-a---ops-per-sample-calibration-k) resolves `K > 1` (common for bodies under 10 µs), each **sample** is the mean of `K` back-to-back operations. Therefore, percentiles, `MinNs`, `MaxNs`, and the histogram describe **batch means**, not individual operations. A single slow operation is averaged with its `K-1` neighbors, which understates true per-operation tail latency.
 >
-> This is a deliberate trade-off to amortize timer overhead. If you need genuine per-op tail latency, pin `OpsPerSample = 1`. Note that at this scale, reported values are dominated by timer resolution and read overhead; compare these results against a baseline measured the same way. Bodies that already span $\ge$ `AutoTune.TargetSampleDurationNs` (10 µs) keep `K = 1` and already provide per-operation percentiles.
+> This is a deliberate trade-off to amortize timer overhead. If you need genuine per-op tail latency, pin `OpsPerSample = 1`. At this scale, reported values are dominated by timer resolution and read overhead; compare these results against a baseline measured the same way. Bodies that already span $\ge$ `AutoTune.TargetSampleDurationNs` (10 µs) keep `K = 1` and already provide per-operation percentiles.
 
 ### Min and max
 
@@ -103,7 +103,7 @@ For typical auto-resolved sample counts (tens to low hundreds), the t critical v
 
 ### Honest caveats
 
-The CI is on the **Mean** and relies on the [Central Limit Theorem](https://en.wikipedia.org/wiki/Central_limit_theorem), which assumes the sample mean is approximately normally distributed. This is generally safe for `n ≥ 30`. For very small sample counts, the approximation is weaker, but the t-distribution's heavier tails provide some protection.
+The CI is on the **mean** and relies on the [Central Limit Theorem](https://en.wikipedia.org/wiki/Central_limit_theorem), which assumes the sample mean is approximately normally distributed. This is generally safe for `n ≥ 30`. For very small sample counts, the approximation is weaker, but the t-distribution's heavier tails provide some protection.
 
 ### T-critical values in practice
 
@@ -125,7 +125,7 @@ While the t-interval describes the mean, the median is the headline comparison m
 
 For `n < 50`, the rank bounds are exact, derived from the binomial(`n`, ½) distribution. The interval `[X(l), X(u)]` covers the median with probability $1 − 2·\text{CDF}(l−1)$, where `l` is the largest rank whose lower-tail mass does not exceed $\alpha/2$.
 
-For `n \ge 50`, NBenchmark uses the normal approximation to the binomial: `l = ⌊(n − z√n)/2⌋` and `u = ⌈1 + (n + z√n)/2⌉`, where `z = Φ⁻¹((1+CL)/2)`.
+For `n ≥ 50`, NBenchmark uses the normal approximation to the binomial: `l = ⌊(n − z√n)/2⌋` and `u = ⌈1 + (n + z√n)/2⌉`, where `z = Φ⁻¹((1+CL)/2)`.
 
 The interval is computed on the same trimmed set as the `MedianNs`. It is always present in JSON output and appears in the advanced-detail stats block.
 

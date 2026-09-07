@@ -157,7 +157,7 @@ Key observations:
 
 **`samples/DependencyInjection/`**
 
-This sample uses a `BenchmarkHarness` where the benchmark class has constructor dependencies resolved from a `Microsoft.Extensions.DependencyInjection` container. It demonstrates the `NBenchmark.DependencyInjection` package and the `UseDependencyInjection<T>` method.
+This sample uses a `BenchmarkHarness` where the benchmark class has constructor dependencies resolved from a `Microsoft.Extensions.DependencyInjection` container. It demonstrates the `NBenchmark.DependencyInjection` package and the `WithServices` method.
 
 ```bash
 cd samples/DependencyInjection
@@ -195,9 +195,9 @@ public sealed class DependencyInjectionBenchmarks(OrderRepository repository)
 Key observations:
 
 - The benchmark class takes an `OrderRepository` in its primary constructor and does not require a parameterless constructor.
-- `UseDependencyInjection<T>` combines assembly discovery and DI wiring in one call.
+- `AddFromAssembly<T>().WithServices(...)` combines assembly discovery and DI wiring in two chained calls.
 - `BuildServices` is a static factory; the worker runs it in its own process to ensure the run is isolated.
-- For `DbContext`-style lifetimes, use the scoped variant: `UseScopedDependencyInjection<T>(BuildServices)`.
+- For `DbContext`-style lifetimes, use the scoped variant: `WithScopedServices(BuildServices)`.
 
 ---
 
@@ -258,7 +258,7 @@ For more information, see [Custom outlier detectors](./statistics/outliers.md#cu
 This sample demonstrates process isolation.
 
 - Single mode is isolated by default when using `Benchmark.Run`. Use `Benchmark.RunInProcess` to opt out of isolation.
-- Suite mode measures in a single clean worker process. Use a `[BenchmarkPlan]` factory for suites that maintain live state.
+- Suite mode measures in a single worker process. Use a `[BenchmarkPlan]` factory for suites that maintain live state.
 
 ```bash
 cd samples/IsolatedRuns
@@ -457,7 +457,7 @@ For more information, see [Report Detail Levels](./output/report-detail-levels.m
 
 **`samples/Telemetry/`**
 
-This sample uses a `BenchmarkHarness` to export OTLP telemetry to a Grafana stack in Docker using the `NBenchmark.Exporters.OpenTelemetry` package. The run is isolated, and telemetry from every `nbworker` child is aggregated into a single trace with the harness trace.
+This sample uses a `BenchmarkHarness` to export OTLP telemetry to a Grafana stack in Docker using the `NBenchmark.Exporters.OpenTelemetry` package. The run is isolated, and telemetry from every worker process is merged into a single trace alongside the harness's own.
 
 ```bash
 cd samples/Telemetry

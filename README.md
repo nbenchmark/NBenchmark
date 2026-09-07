@@ -23,7 +23,7 @@ result.Print();
 
 - **No setup.** Use one static call. You don't need attributes, a specific class structure, or a dedicated project.
 - **No guessing.** Warmup, batch size, and sample count resolve automatically.
-- **Clean processes by default.** Results reflect your code rather than the history of your process.
+- **Worker process by default.** Results reflect your code rather than the history of the host process.
 - **Real statistics.** Use confidence intervals and significance testing instead of simple averages.
 - **Zero dependencies.** The core package uses only the BCL.
 
@@ -111,21 +111,21 @@ All harness CLI flags pass through (`--filter`, `--reporter`, `--output`, `--max
 
 ## Features
 
-| Feature | Description | Link |
+| Feature | Description | Docs |
 | --- | --- | --- |
-| Isolated runs | Measures in a fresh worker process to prevent earlier work from biasing the numbers. On by default. | [→](./docs/features/isolated-runs.md) |
-| Parameterized benchmarks | Runs one body across many input values to show how it scales. | [→](./docs/features/parameterized-suite.md) |
-| Categories | Tags benchmarks to include or exclude groups from a run. | [→](./docs/features/categories.md) |
-| Multi-runtime | Runs the same benchmarks on .NET 8, .NET 9, and .NET 10 side-by-side. | [→](./docs/features/multi-runtime.md) |
-| Multiple launches | Repeats a benchmark in separate processes to measure run-to-run variance. | [→](./docs/features/multiple-launches.md) |
-| Environment control | Pins CPU affinity and process priority for the process and measuring thread to reduce noise. | [→](./docs/features/environment-control.md) |
-| Interference rejection | Discards samples that the OS preempted using the measuring thread's CPU occupancy. On by default. | [→](./docs/statistics/outliers.md#evidence-based-interference-rejection) |
-| Performance gates | Fails xUnit, NUnit, or MSTest tests on regression. | [→](./docs/test-integration/index.md) |
-| CI regression gate | Fails the run when a benchmark regresses past a specified percentage. | [→](./docs/reference/cli.md) |
-| Diagnostics | Records GC counts, heap state, exceptions, and CPU time per operation. | [→](./docs/statistics/diagnostics.md) |
-| Live telemetry | Streams per-sample events to an observer or to OpenTelemetry. | [→](./docs/reference/observers.md) |
-| Compile-time analysis | Catches benchmark authoring mistakes as build-time diagnostics. | [→](./docs/reference/analyzers.md) |
-| Pluggable statistics | Allows you to swap in your own outlier detector or significance test. | [→](./docs/guides/custom-statistics.md) |
+| Isolated runs | Measures in a fresh worker process to prevent earlier work from biasing the numbers. On by default. | [Docs](./docs/features/isolated-runs.md) |
+| Parameterized benchmarks | Runs one body across many input values to show how it scales. | [Docs](./docs/features/parameterized-suite.md) |
+| Categories | Tags benchmarks to include or exclude groups from a run. | [Docs](./docs/features/categories.md) |
+| Multi-runtime | Runs the same benchmarks on .NET 8, .NET 9, and .NET 10 side-by-side. | [Docs](./docs/features/multi-runtime.md) |
+| Multiple launches | Repeats a benchmark in separate processes to measure run-to-run variance. | [Docs](./docs/features/multiple-launches.md) |
+| Environment control | Pins CPU affinity and process priority for the process and measuring thread to reduce noise. | [Docs](./docs/features/environment-control.md) |
+| Interference rejection | Discards samples that the OS preempted using the measuring thread's CPU occupancy. On by default. | [Docs](./docs/statistics/outliers.md#evidence-based-interference-rejection) |
+| Performance gates | Fails xUnit, NUnit, or MSTest tests on regression. | [Docs](./docs/test-integration/index.md) |
+| CI regression gate | Fails the run when a benchmark regresses past a specified percentage. | [Docs](./docs/reference/cli.md) |
+| Diagnostics | Records GC counts, heap state, exceptions, and CPU time per operation. | [Docs](./docs/statistics/diagnostics.md) |
+| Live telemetry | Streams per-sample events to an observer or to OpenTelemetry. | [Docs](./docs/reference/observers.md) |
+| Compile-time analysis | Catches benchmark authoring mistakes as build-time diagnostics. | [Docs](./docs/reference/analyzers.md) |
+| Pluggable statistics | Allows you to swap in your own outlier detector or significance test. | [Docs](./docs/guides/custom-statistics.md) |
 
 ## Built on real statistics
 

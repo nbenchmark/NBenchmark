@@ -51,14 +51,14 @@ dotnet run -c Release -- \
 
 - **Process priority** (`--priority high`): This reduces preemption by unrelated OS tasks. If the runner denies the priority elevation (which is common on locked-down runners), the engine issues a warning, but the run proceeds at the priority allowed by the host. The priority is restored once the run completes.
 
-- **Dedicated-host guidance** (`--host-quality-warnings`): This is a non-fatal pre-run probe that warns you if the host appears noisy (e.g., low core count, unraisable priority, or macOS thermal/frequency scaling). It provides guidance rather than acting as a gate. For more information, see [Environment control](../features/environment-control.md).
+- **Dedicated-host guidance** (`--host-quality-warnings`): This is a non-fatal pre-run probe that warns you if the host appears noisy (for example, low core count, unraisable priority, or macOS thermal/frequency scaling). It provides guidance rather than acting as a gate. For more information, see [Environment control](../features/environment-control.md).
 
 - **Launch count** (`--launch-count 5`): The engine runs each benchmark five times as independent launches and reports the cross-launch aggregation. On a contested host, per-launch medians will likely disagree. This disagreement is the "honest signal" that indicates noise is present. The reported number is the average across launches, the interval represents the spread between them, and significance is computed using samples pooled from all launches. For more information, see [Multiple launches](../features/multiple-launches.md).
 
 - **Threshold gate** (`--max-regression-percent 10`): After collecting all results, the harness compares the median of each non-baseline result against the baseline. If any result exceeds `baseline * (1 + 10/100)`, the harness sets `Environment.ExitCode = 1` and prints the names of the regressed benchmarks to stderr. In multi-runtime mode, the check is grouped within each runtime. For more information, see the [CLI reference](../reference/cli.md).
 
 > [!IMPORTANT] Order of operations
-> Isolation and environment control reduce noise at the source, and the threshold gate then decides based on those cleaned numbers. If you use `--max-regression-percent` without noise reduction, you may encounter false positives on shared runners because the gate will fire on noise rather than actual regressions. Always pair the gate with isolation, environment control, or `--launch-count`.
+> Isolation and environment control reduce noise at the source, and the threshold gate then decides based on those cleaned numbers. If you use `--max-regression-percent` without noise reduction, you may encounter false positives on shared runners because the gate fires on noise rather than actual regressions. Always pair the gate with isolation, environment control, or `--launch-count`.
 
 ## Run the benchmark
 
@@ -89,7 +89,7 @@ When using a noisy runner, monitor these three indicators:
 
 1. **The auto-tune line (Advanced detail)**: If `jitter` is above 0.10, the host is contested. In this case, the engine automatically switches the outlier detector from an IQR fence to MAD. This is expected on shared runners.
 2. **The launch aggregation table (when `--launch-count > 1`)**: If per-launch medians span a wide range, this variance is the primary finding. A single launch would have reported one of those medians with a tight error bar, which would be misleading.
-3. **The threshold check**: If the process exits with a non-zero code, stderr will list the regressed benchmarks. If it exits with zero, no benchmark regressed beyond the 10% threshold.
+3. **The threshold check**: If the process exits with a non-zero code, stderr lists the regressed benchmarks. If it exits with zero, no benchmark regressed beyond the 10% threshold.
 
 A tight error column next to a `maxCeiling` stop on a shared runner does not necessarily mean the measurement converged. The CI-width stop rule runs on the raw stream, while the error is computed on the trimmed set. Check the `autoTune.sampleStop` field before trusting the margin. For more information, see [Raw vs. trimmed statistics](../statistics/measurement.md#raw-vs-trimmed-statistics) and the [Troubleshooting guide](../troubleshooting.md).
 

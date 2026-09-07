@@ -57,16 +57,16 @@ public sealed class OrderBenchmarks(IOrderRepository repository)
 }
 ```
 
-`UseDependencyInjection<T>` is shorthand for `AddFromAssembly<T>().WithServices(BuildServices)`. It discovers the assembly containing `T`, configures the host to resolve benchmark instances from a container built by the factory, and runs the benchmarks.
+`AddFromAssembly<T>().WithServices(BuildServices)` handles discovery and DI wiring together. It discovers the assembly containing `T`, configures the host to resolve benchmark instances from a container built by the factory, and runs the benchmarks.
 
 ## Extension methods
 
-Choose the granularity that matches your needs. All four methods take a factory. The engine does not provide an overload that takes a built container directly (see the note below).
+Choose the granularity that matches your needs. Each method takes a factory. The engine does not provide an overload that takes a built container directly (see the note below).
 
 | Method | When to use it |
 | --- | --- |
-| `UseDependencyInjection<T>(BuildServices)` | Common case. Discovers `T`'s assembly and resolves from the root provider. |
-| `UseScopedDependencyInjection<T>(BuildServices)` | Similar to above, but creates a fresh DI scope per instance and disposes it after teardown. This is ideal for `DbContext`, EF Core, and other scoped services. It is isolated because the worker builds its own container and scopes. |
+| `AddFromAssembly<T>()` + `WithServices(BuildServices)` | Common case. Discovers `T`'s assembly and resolves from the root provider. |
+| `AddFromAssembly<T>()` + `WithScopedServices(BuildServices)` | Similar to above, but creates a fresh DI scope per instance and disposes it after teardown. This is ideal for `DbContext`, EF Core, and other scoped services. It is isolated because the worker builds its own container and scopes. |
 | `WithServices(BuildServices)` | Use this if you've already called `AddFromAssembly` (perhaps with multiple assemblies) and want to plug in the root provider. It is isolated. |
 | `WithScopedServices(BuildServices)` | Similar to above, but provides a fresh scope per instance. It is isolated. |
 
@@ -120,7 +120,7 @@ static IServiceProvider BuildServices() => new ServiceCollection()
     .BuildServiceProvider();
 ```
 
-`WithScopedServices` uses `WithScopedServices` internally. With `PerMethod` lifetime, each `[Benchmark]` method receives a fresh `MyDbContext`, preventing shared state or cache contamination between methods.
+`WithScopedServices` registers a scoped service-provider instance source on the harness. With `PerMethod` lifetime, each `[Benchmark]` method receives a fresh `MyDbContext`, preventing shared state or cache contamination between methods.
 
 > **Shared state breaks statistical independence.** If you pair `WithScopedServices` with `[InstanceLifetime(InstanceLifetime.PerClass)]`, one instance and one scope serve every `[Benchmark]` method in the class. A scoped service like `DbContext` caches entities and queries; therefore, method A could warm the cache that method B reads. This links the timings of the two methods, violating the independence assumption of the Mann-Whitney U test used for significance. Consequently, the engine resolves this combination to `PerMethod`, and the results include a warning. You can implement `IStateReset` to keep `PerClass` and reset state between methods, or use `[SharedState]` to declare the carry-over as deliberate. The NB0011 analyzer reports this combination at compile time. For more information, see the [state isolation guide](./state-isolation.md) and the [NB0011 reference](../reference/analyzers.md#nb0011---perclass-lifetime-with-scoped-service).
 
@@ -153,7 +153,7 @@ The container resolves all constructor parameters from registered services. If a
 
 ## Using a non-Microsoft container
 
-The package uses the BCL `IServiceProvider` interface, so any container that exposes one is supported (e.g., Autofac, DryIoc, SimpleInjector, Lamar). Build the container inside a static factory so the worker can rebuild it:
+The package uses the BCL `IServiceProvider` interface, so any container that exposes one is supported (for example, Autofac, DryIoc, SimpleInjector, and Lamar). Build the container inside a static factory so the worker can rebuild it:
 
 ```csharp
 await BenchmarkHarness.Create(args)
@@ -218,7 +218,7 @@ This error occurs when `Activator.CreateInstance` cannot construct your benchmar
    static IServiceProvider BuildServices() => services; // Use your container build logic here
    ```
 
-   `WithServices` is a core-library method. For scoped lifetimes (such as EF Core's `DbContext`), install `NBenchmark.DependencyInjection` and use `WithScopedServices` or `UseScopedDependencyInjection<T>`.
+   `WithServices` is a core-library method. For scoped lifetimes (such as EF Core's `DbContext`), install `NBenchmark.DependencyInjection` and use `WithScopedServices`.
 
 ## See also
 

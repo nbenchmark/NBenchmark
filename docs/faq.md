@@ -10,9 +10,9 @@ order: 12
 
 ### How is NBenchmark different from BenchmarkDotNet?
 
-NBenchmark provides statistical rigor - including non-parametric significance testing, confidence intervals, and percentile analysis - directly for your daily development cycle with zero configuration and no external dependencies. Its numerical core is dependency-free and cross-validated against SciPy and NumPy to machine precision. For more information, see [Validation & Accuracy](./statistics/validation.md).
+NBenchmark provides statistical rigor - including non-parametric significance testing, confidence intervals, and percentile analysis - directly in your daily development cycle with zero configuration and no external dependencies. Its numerical core is dependency-free and cross-validated against SciPy and NumPy to machine precision. For more information, see [Validation & Accuracy](./statistics/validation.md).
 
-NBenchmark makes different trade-offs than tools like BenchmarkDotNet: it uses no out-of-process compilation, no XML configuration, and minimal dependencies. You can get started with three lines of code.
+NBenchmark makes different trade-offs from tools like BenchmarkDotNet: it uses no out-of-process compilation, no XML configuration, and minimal dependencies. You can get started with three lines of code.
 
 The two tools are complementary. Use NBenchmark for day-to-day development feedback and BenchmarkDotNet for publishable cross-platform results. For help with common measurement issues, see the [Troubleshooting guide](./troubleshooting.md).
 
@@ -174,7 +174,7 @@ Yes. Use the CLI flag:
 dotnet run -- --order declaration
 ```
 
-Or use code: `.WithRunOrder(RunOrder.Declaration)`.
+Or in code: `.WithRunOrder(RunOrder.Declaration)`.
 
 ### How do I make the run order reproducible?
 
@@ -242,7 +242,7 @@ The worker runs `BuildServices` in its own process and resolves the class from t
 
 ### Can I use a DI container other than Microsoft.Extensions.DependencyInjection?
 
-Yes. The companion package only depends on `IServiceProvider` from the BCL. Any container that exposes an `IServiceProvider` (such as Autofac, DryIoc, SimpleInjector, or Lamar) works. Build the container inside a static factory and pass that factory to the host:
+Yes. The companion package only depends on `IServiceProvider` from the BCL. Any container that exposes an `IServiceProvider` (for example, Autofac, DryIoc, SimpleInjector, or Lamar) works. Build the container inside a static factory and pass that factory to the host:
 
 ```csharp
 await BenchmarkHarness.Create(args)

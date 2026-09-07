@@ -153,7 +153,7 @@ static BenchmarkSuite BuildSuite()
 The factory must follow these constraints:
 
 - **Must be `static` and capture nothing.** The worker locates it by metadata token and has no receiver to bind to.
-- **Invoked multiple times.** It runs once in the coordinator (to read the baseline, reporters, and profile) and once per replicate in each measuring worker.
+- **Invoked multiple times.** It runs once in the coordinator (to read the baseline, reporters, and runtime profile) and once per replicate in each measuring worker.
 - **Must only wire delegates.** Do not perform the actual work in the factory, as it would run on top of the measurement. Use `WithSuiteSetup` or a `prepare` delegate for state creation.
 - **Wrong shapes throw.** A method marked `[BenchmarkPlan]` that doesn't meet these requirements throws an exception to alert the author.
 
@@ -173,7 +173,7 @@ A factory can carry its own argument values via the `BodyRef` used to address it
 
 `Workers/ArgumentSource` determines how a body parameter gets its value: either as an encoded `Value` or a `Recipe` the worker invokes. `BodyRef.Arguments` lists these sources, aligned with the body's parameters.
 
-This unified approach supports combinations that were previously impossible. The two slots replaced two separate slots on `BodyRef` - a list of encoded values and a single prepared-state factory - documented as mutually exclusive, because nothing could express the combinations in between, and four of the isolation gaps are those combinations: a second prepared value, a prepare delegate taking arguments of its own, a parameter sweep whose values are too complex to encode (`WithParameter("payload", ("small", () => …), ("large", () => …))`), and a sweep mixing the two. Per slot, all four are one shape and none needs a wire field of its own.
+One slot can hold an encoded value, a recipe, or a mix of both. Where `BodyRef` once kept a list of encoded values and a single prepared-state factory, documented as mutually exclusive because nothing could express the combinations in between, the two now-unified slots cover every combination, and four of the isolation gaps are those combinations: a second prepared value, a prepare delegate taking arguments of its own, a parameter sweep whose values are too complex to encode (`WithParameter("payload", ("small", () => …), ("large", () => …))`), and a sweep mixing the two. Per slot, all four are one shape and none needs a wire field of its own.
 
 In a recipe-valued sweep, the engine names rows based on the label, not the value, because the value isn't known until the recipe runs in the worker. The recipe is not invoked in the coordinator for isolated runs to avoid unnecessary work.
 
@@ -191,10 +191,10 @@ The type the factory must produce is **not** carried. `NBenchmark.Worker/Factory
 
 Every result includes an `IsolationStatus` indicating where it was measured and, if not isolated, why.
 
-- **Requested In-Process:** `Isolated` and `InProcessRequested` occur when the user explicitly asks for the current state (e.g., via `--in-process` or `[Isolation(Isolation.Off)]`).
+- **Requested In-Process:** `Isolated` and `InProcessRequested` occur when the user explicitly asks for the current state (for example, via `--in-process` or `[Isolation(Isolation.Off)]`).
 - **Refusals:** `InProcessCapturedState`, `InProcessLiveFixture`, `InProcessUnaddressablePlan`, and `InProcessNoWorker` occur when the engine cannot isolate the run.
 
-The `Iso` column in reports keys on refusals rather than just `!IsIsolated()`. Keying on `!IsIsolated()` treats a deliberate in-process run as a failure, which would put a column reading `no` on every row of an `--in-process` run and, because reporters trade the two, remove the bar column. This ensures that deliberate in-process runs don't look like failures. Conversely, the column renders whenever *anything* was refused rather than only when statuses are mixed: a table where nothing could be isolated has one distinct status, so the mixed rule suppressed it for exactly the run a reader is most likely to misread.
+The `Iso` column in reports keys on refusals rather than just `!IsIsolated()`. Keying on `!IsIsolated()` treats a deliberate in-process run as a failure, which would put a column reading `no` on every row of an `--in-process` run and, because reporters trade the two, remove the bar column. Conversely, the column renders whenever *anything* was refused rather than only when statuses are mixed: a table where nothing could be isolated has one distinct status, so a mixed-only rule would suppress the column for exactly the run a reader is most likely to misread.
 
 Errored rows have no provenance because they were not measured. This prevents errored rows from incorrectly flagging a run as non-isolated.
 
@@ -204,7 +204,7 @@ If a user explicitly requests isolation via `[Isolation(Isolation.Required)]` an
 
 ## Required isolation
 
-A refusal is treated as an error. `MeasurementOptions.Isolation` defaults to `true`, meaning a benchmark that cannot be isolated fails the run instead of falling back to the host process.
+A refusal is treated as an error. `MeasurementOptions.Isolation` defaults to `Isolation.Required`, meaning a benchmark that cannot be isolated fails the run instead of falling back to the host process.
 
 This default is acceptable because most isolation gaps (captured locals, prepared values, scoped containers) now support isolation.
 

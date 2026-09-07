@@ -25,7 +25,7 @@ A one-line footer shows the benchmark count, total duration, and confidence leve
 
 ## Standard mode
 
-Standard mode shows the comparison table with additional columns (mean, Mag, Description) and several auxiliary sections:
+Standard mode shows the comparison table with additional columns (Mean, Mag, Description) and several auxiliary sections:
 
 - **Precision & Tail Latency table**: Displays Error (±CI), StdDev, CV, and upper-tail percentiles (such as P95, P99, etc.).
 - **Diagnostics table**: Displays GC Gen0/Gen1/Gen2 collection counts, heap info, CPU/wall ratio, and exceptions per op when diagnostics are enabled. For more information, see [Diagnostics](../statistics/diagnostics.md).
@@ -34,7 +34,7 @@ Standard mode shows the comparison table with additional columns (mean, Mag, Des
 - **Auto-tune summary lines**: Displays resolved warmup, sample count, ops-per-sample, and achieved CI half-width.
 - **Warnings**: Displays warnings when present.
 
-Use this level if you need to understand variability and the statistical rigour behind your results.
+Use this level if you need to understand variability and the statistical rigor behind your results.
 
 ## Advanced mode
 
@@ -90,7 +90,7 @@ dotnet run -- --detail simple
 | `standard` | Displays the full comparison table plus Precision & Tail Latency, auto-tune, and Interpretation sections. |
 | `advanced` | Displays everything in standard mode plus a per-benchmark stats block including quartiles, fences, confidence interval, skewness, kurtosis, MAD, configured percentiles, and allocation breakdown. |
 
-The `--detail` flag affects all registered reporters. Note that JSON always emits the full record regardless of the detail level.
+The `--detail` flag affects all registered reporters. JSON always emits the full record regardless of the detail level.
 
 ### Using Single mode
 

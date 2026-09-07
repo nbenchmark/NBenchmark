@@ -147,7 +147,7 @@ The number of times to repeat each benchmark as a separate launch (`int`). You c
 
 The default is `1`. In Harness mode, NBenchmark applies `5` by default if the launch count is not explicitly pinned. Pass `WithLaunchCount(1)` to opt out of the harness default.
 
-Five launches are used because the between-launch interval is a Student-t half-width on `k - 1` degrees of freedom. The critical value falls steeply over the first few replicates: 12.71 at `k = 2`, 4.30 at 3, 3.18 at 4, and 2.78 at 5. Below five, the interval is often too wide for a real regression to be clear. Past five, replicates cost linearly but provide diminishing returns.
+Harness mode defaults to five launches because the between-launch interval is a Student-t half-width on `k - 1` degrees of freedom. The critical value falls steeply over the first few replicates: 12.71 at `k = 2`, 4.30 at 3, 3.18 at 4, and 2.78 at 5. Below five, the interval is often too wide for a real regression to be clear. Past five, replicates cost linearly but provide diminishing returns.
 
 | Value | Behavior |
 | --- | --- |
@@ -196,7 +196,7 @@ Select a preset using `.WithAutoTune(AutoTuneOptions.Thorough)` (suite/harness) 
 | `MinWarmupSamples` / `MaxWarmupSamples` | `8` / `100,000` | Floor and ceiling for auto-detected warmup length, as sample counts. `MaxWarmupSamples` is set high so that the *time* bounds typically bind first. A fast body may need tens of thousands of samples to accumulate `MinWarmupTime`. (The tighter `10,000` limit applies to *pinned* `WarmupSamples`.) |
 | `WarmupEpsilon` | `0.02` | The minimum relative improvement a warmup batch must show to be considered "still warming up". |
 | `PlateauPatience` | `3` | The number of consecutive non-improving batches that end warmup. |
-| `MinWarmupTime` | `500 ms` | The minimum in-body time auto-warmup must accumulate before it can settle. This ensures background tiered JIT (tier-0 $\rightarrow$ tier-1 $\rightarrow$ dynamic PGO) lands before measurement. This floor is 5× the runtime's `TieredCompilation.CallCountingDelayMs` (100 ms). `0` disables the floor and the JIT-quiescence gate. `Thorough` uses 1 s; `Quick` inherits 500 ms. |
+| `MinWarmupTime` | `500 ms` | The minimum in-body time auto-warmup must accumulate before it can settle. This ensures background tiered JIT (tier-0 -> tier-1 -> dynamic PGO) lands before measurement. This floor is 5× the runtime's `TieredCompilation.CallCountingDelayMs` (100 ms). `0` disables the floor and the JIT-quiescence gate. `Thorough` uses 1 s; `Quick` inherits 500 ms. |
 | `RequireJitQuiescence` | `true` | Whether auto-warmup also waits until the JIT has been quiet for `JitQuietPeriod` (read from `System.Runtime.JitInfo` at each batch boundary). This deactivates once warmup has run 4 × `MinWarmupTime` to prevent a busy in-process host from blocking warmup indefinitely. Inactive when `MinWarmupTime = 0`. |
 | `JitQuietPeriod` | `50 ms` | The duration the JIT compiled-method count must remain unchanged before the quiescence gate opens. A sustained interval is required because a per-batch check cannot work for fast bodies. Clamped down to `MinWarmupTime`. `0` disables the gate. `Thorough` uses 100 ms. |
 | `MinSamples` / `MaxSamples` | `30` / `5,000` | Floor and ceiling for the auto-resolved measured-sample count. `MinSamples` is the validity floor; below it, the interval is untrustworthy. `MaxSamples` is 5,000 because the required count grows quadratically as the target narrows. |
@@ -244,7 +244,7 @@ options with { ForceGcBeforeEachSample = true }
 // Inherit the warmup heap under PerSampleCollect (skip the pre-measurement GC)
 options with { ForceGcBeforeMeasurement = false }
 
-// Disable the between-benchmark GC (both profiles)
+// Disable the between-benchmark GC (both GC behaviors)
 options with { ForceGcBetweenBenchmarks = false }
 ```
 
@@ -273,7 +273,7 @@ These settings can only be applied as a process starts. Therefore, they can only
 
 NBenchmark reports what was actually applied. Every result carries:
 - `RuntimeProfileName`: The profile in effect, or `"host"` when inherited.
-- `RuntimeKnobs`: The active knobs (e.g., `"tiered=off pgo=off r2r=off concurrentGc=off"`).
+- `RuntimeKnobs`: The active knobs (such as `"tiered=off pgo=off r2r=off concurrentGc=off"`).
 
 Results measured under different runtime profiles are **never placed in the same comparison group**. No significance test, effect size, ratio, or threshold gate spans different profiles.
 
@@ -321,7 +321,7 @@ ForceGcBetweenBenchmarks => ForceGcBetweenBenchmarks ?? true
 
 A **computed property** (or `ForceGcBetweenBenchmarks`). When `true`, a full Gen2 GC (with finalizer wait) runs between benchmarks. This prevents one benchmark's leftover heap from biasing the next, which would make results order-dependent and undermine the significance test's independence assumption.
 
-This is on by default for **both** profiles. Set `ForceGcBetweenBenchmarks = false` or use `--no-gc-between-benchmarks` on the CLI if inter-benchmark heap carry-over is intended.
+This is on by default for **both** GC behaviors. Set `ForceGcBetweenBenchmarks = false` or use `--no-gc-between-benchmarks` on the CLI if inter-benchmark heap carry-over is intended.
 
 ### MeasureAllocations
 
@@ -331,7 +331,7 @@ MeasureAllocations => MeasureAllocations ?? true
 
 A **computed property** (or `MeasureAllocations`). When `true`, NBenchmark samples `GC.GetAllocatedBytesForCurrentThread` around each sample and reports the mean bytes allocated per operation in the **Alloc/op** column.
 
-This is on by default for **both** profiles. The snapshot is taken outside the timed window, so it does not affect timing purity. To disable allocation tracking, set `MeasureAllocations = false` or use `--no-allocations` on the CLI.
+This is on by default for **both** GC behaviors. The snapshot is taken outside the timed window, so it does not affect timing purity. To disable allocation tracking, set `MeasureAllocations = false` or use `--no-allocations` on the CLI.
 
 BenchmarkSuite fluent method: `.WithAllocations()`
 
@@ -402,7 +402,7 @@ The host drift canary runs a fixed, deterministic control workload at every benc
 
 Each result carries readings taken on either side of it in `BenchmarkResult.HostTimeline`. The `RelativeToRunStart` value is the number to compare between rows: `1.07` means the fixed work took 7% longer at that point in the run than it did at the start.
 
-A warning is issued when the difference between a benchmark and the baseline is smaller than the distance the host moved between the two measurement points:
+NBenchmark issues a warning when the difference between a benchmark and the baseline is smaller than the distance the host moved between the two measurement points:
 
 ```
 host drift exceeds the difference being reported: the machine was 8% slower when 'Candidate' was
@@ -532,7 +532,7 @@ The ceiling on the encoded size of the values a benchmark's closure sends to a m
 
 Exceeding this limit results in a refusal that names the prepare delegate, rather than truncation. A truncated capture would measure a smaller input, which is incorrect.
 
-The value must be between 1 byte and 32 MiB; a value outside that range throws from the initializer. Raising it towards the ceiling is not recommended, as it may lead to transport failures that crash the entire group.
+The value must be between 1 byte and 32 MiB; a value outside that range throws from the initializer. Raising it toward the ceiling is not recommended, as it may lead to transport failures that crash the entire group.
 
 ```csharp
 // A benchmark over a genuinely large prepared input, kept isolated:
@@ -569,7 +569,7 @@ CLI flag: `--confidence 0.99`
 ReportedPercentiles = [0.50, 0.95, 0.99, 0.999, 1.0]   // default
 ```
 
-The set of percentile values computed from the trimmed samples (`IReadOnlyList<double>`). Each value must be between 0 and 1 inclusive. Values between 0.50 and 1.0 appear as columns in reporter tail-latency tables.
+The set of percentile values computed from the trimmed samples (`IReadOnlyList<double>`). Each value must be between 0 and 1 inclusive. Values greater than 0.50 and less than 1.0 appear as columns in reporter tail-latency tables.
 
 | Value | Behavior |
 | --- | --- |
@@ -579,7 +579,7 @@ The set of percentile values computed from the trimmed samples (`IReadOnlyList<d
 
 Computed values are stored in `BenchmarkResult.Percentiles` as `IReadOnlyList<PercentileEntry>`. Use `result.GetPercentile(0.95)` to retrieve a specific value.
 
-CLI flag: `--percentiles <list>` (comma-separated, e.g., `--percentiles 0.90,0.99,0.999`).
+CLI flag: `--percentiles <list>` (comma-separated, such as `--percentiles 0.90,0.99,0.999`).
 
 ### EnableHistogram
 
@@ -624,7 +624,7 @@ Disable this to reduce overhead:
 SignificanceLevel = 0.05   // default
 ```
 
-The significance threshold (alpha) used to compare a result's p-value. A result is flagged as significant when `p < SignificanceLevel`. This must be a value strictly between 0 and 1. Lower this (e.g., `0.01`) to demand stronger evidence before marking a difference as real.
+The significance threshold (alpha) used to compare a result's p-value. A result is flagged as significant when `p < SignificanceLevel`. This must be a value strictly between 0 and 1. Lower it (for example, to `0.01`) to demand stronger evidence before marking a difference as real.
 
 CLI flag: `--significance-level 0.01`
 
@@ -658,7 +658,7 @@ A `null` value is not inert. `ThreadControl` defaults to enabled and applies thr
 
 | Field | Type | Default | Effect |
 | --- | --- | --- | --- |
-| `CpuAffinity` | `IReadOnlyList<int>?` | `null` | Logical CPU core indices to pin the process **and the measuring thread** to (e.g., `[2, 3]`). Restored on run exit. Linux/Windows only; ignored on macOS. |
+| `CpuAffinity` | `IReadOnlyList<int>?` | `null` | Logical CPU core indices to pin the process **and the measuring thread** to (such as `[2, 3]`). Restored on run exit. Linux/Windows only; ignored on macOS. |
 | `ProcessPriority` | `ProcessPriorityClass?` | `null` | Process priority to request, and (on Windows) the measuring thread's priority to match. `High` is recommended for dedicated hosts. Restored on run exit. |
 | `ThreadControl` | `bool` | **`true`** | Applies thread-scoped controls: thread affinity, thread priority (Windows), and on macOS the `QOS_CLASS_USER_INTERACTIVE` class for Apple Silicon performance cores. Set `false` to measure under the host's default scheduling. |
 | `HostQualityWarnings` | `bool` | `false` | Emits a non-fatal pre-run warning when the host looks noisy (low core count, unraisable priority, or macOS core split). On a suitable host, it suggests using `--priority high`. |
@@ -747,7 +747,7 @@ public void MyExpensiveBenchmark() => SlowOperation();
 
 ## Categories
 
-Categories are metadata declared with `[BenchmarkCategory]` and used for filtering. They are not part of `MeasurementOptions`. See the [Categories guide](../features/categories.md) for more information.
+Categories are metadata declared with `[BenchmarkCategory]` and used for filtering. They are not part of `MeasurementOptions`. For more information, see the [Categories guide](../features/categories.md).
 
 ## Valid ranges summary
 

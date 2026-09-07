@@ -1,6 +1,6 @@
 ---
 title: "Isolated Runs"
-description: Run benchmarks in clean worker processes so earlier work can't bias the measurement.
+description: Run benchmarks in freshly spawned worker processes so earlier work can't bias the measurement.
 order: 1
 ---
 
@@ -147,8 +147,8 @@ Most data crosses to the worker automatically: ordinary data (such as `int`, `st
 
 | Item | Remedy |
 | --- | --- |
-| **Live objects** (e.g., `Stream`, `DbConnection`, `HttpClient`, mock, or built `IServiceProvider`) | Build it in a `prepare:` delegate, or pass a factory instead of the object |
-| **Values with behavior not carried by contents** (e.g., a dictionary with a custom comparer) | Use a `prepare:` delegate, or mark your own type with `[BenchmarkState]` |
+| **Live objects** (such as `Stream`, `DbConnection`, `HttpClient`, mock, or built `IServiceProvider`) | Build it in a `prepare:` delegate, or pass a factory instead of the object |
+| **Values with behavior not carried by contents** (such as a dictionary with a custom comparer) | Use a `prepare:` delegate, or mark your own type with `[BenchmarkState]` |
 | **Captures larger than 8 MiB** (`MaxTransferredStateBytes`) | Use a `prepare:` delegate |
 | **Shared objects** (two benchmarks sharing one object through different closures) | Build the shared state in one shared `prepare:` delegate |
 | **Suites requiring user-code construction** | Use a static `[BenchmarkPlan]` factory with `RunPlanAsync` |
@@ -182,7 +182,7 @@ For more information, see the [CLI reference](../reference/cli.md#isolation).
 - **Isolation adds about 70 ms per worker launch.** Compared to the per-benchmark floor of roughly 600 ms, this is a small tax.
 - **`LaunchCount` is a replicate count, and each replicate uses a fresh process.** This provides a run-to-run reproducibility estimate rather than repeating the measurement inside one process.
 - **Wedged workers cannot hang the run.** The engine kills a worker once it exceeds a wall-clock ceiling and reports its benchmarks as errored. Increase `--max-tuning-time` if the work is genuinely slow.
-- **Workers cannot outlive the run.** If the coordinating process exits (clean finish, Ctrl-C, crash, or IDE stop), the worker stops at its next sample and exits.
+- **Workers cannot outlive the run.** If the host process exits (clean finish, Ctrl-C, crash, or IDE stop), the worker stops at its next sample and exits.
 
 ## See also
 

@@ -85,11 +85,11 @@ public readonly record struct MeasurementPhaseEvent(
 - `Phase`: One of `Jitter`, `Calibration`, `Warmup`, or `Measurement`.
 - `Transition`: `Starting` or `Completed`.
 - `JitterMetric`: Present only for `Phase 0` `Completed` events.
-- `DetectorSwitched`: Meaningful only for `Phase 0` `Completed` events (`true` = IQR $\rightarrow$ MAD auto-switch).
+- `DetectorSwitched`: Meaningful only for `Phase 0` `Completed` events (`true` = IQR -> MAD auto-switch).
 - `ResolvedK`: Set on `Calibration` completed; the calibrated ops-per-sample count.
 - `ResolvedWarmup`: Set on `Warmup` completed; the number of warmup samples that ran.
-- `WarmupStop`: Set on `Warmup` completed; why warmup stopped (e.g., `ExplicitCount`, `Settled`, `MaxCeiling`, `WallClockCap`).
-- `SampleStop`: Set on `Measurement` completed; why measurement stopped (e.g., `ExplicitCount`, `CiTargetMet`, `MaxCeiling`, `WallClockCap`).
+- `WarmupStop`: Set on `Warmup` completed; why warmup stopped (such as `ExplicitCount`, `Settled`, `MaxCeiling`, `WallClockCap`).
+- `SampleStop`: Set on `Measurement` completed; why measurement stopped (such as `ExplicitCount`, `CiTargetMet`, `MaxCeiling`, `WallClockCap`).
 
 ### SampleEvent
 

@@ -43,9 +43,9 @@ Each guide is self-contained and provides a runnable example following this patt
 1. **Scenario**: The goal you want to achieve.
 2. **Complete example**: A copy-pasteable configuration body.
 3. **What's happening**: Brief callouts on feature interactions with links to feature pages for more depth.
-4. **Run it**: The `dotnet run` or CLI invocations required to execute the benchmark.
+4. **Run the benchmark** (or **Run the tests**): The `dotnet run` or CLI invocations required to execute the benchmark.
 5. **Read the results**: A plain-English explanation of the output, linking to [Reading Your Results](../getting-started/reading-your-results.md).
-6. **When to go deeper**: Links to relevant feature and statistics pages.
+6. **Next steps**: Links to relevant feature and statistics pages.
 
 If you are new to NBenchmark, start with the [Quick start](../getting-started/quick-start.md) and [Key concepts](../getting-started/key-concepts.md) before using these guides.
 

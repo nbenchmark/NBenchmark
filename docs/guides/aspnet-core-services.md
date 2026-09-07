@@ -47,7 +47,7 @@ public sealed class OrderBenchmarks(BenchDbContext db)
 
 ## What's happening
 
-- **`UseScopedDependencyInjection<T>(BuildServices)`**: This method performs three actions: it discovers the assembly for `T`, configures instances to be resolved from a container built by your factory, and creates a fresh DI scope per `[Benchmark]` method. The engine disposes of the scope during per-method teardown, ensuring that any `IDisposable` or `IAsyncDisposable` services (such as `DbContext` or `HttpClient`) are cleaned up. For more information, see [Dependency Injection](../features/dependency-injection.md).
+- **`AddFromAssembly<T>().WithScopedServices(BuildServices)`**: This combination performs three actions: it discovers the assembly for `T`, configures instances to be resolved from a container built by your factory, and creates a fresh DI scope per `[Benchmark]` method. The engine disposes of the scope during per-method teardown, ensuring that any `IDisposable` or `IAsyncDisposable` services (such as `DbContext` or `HttpClient`) are cleaned up. For more information, see [Dependency Injection](../features/dependency-injection.md).
 
 - **Using a factory instead of a provider**: You must pass a factory rather than a pre-built `IServiceProvider`. Because a container is live code containing singletons and open connections, it cannot cross a process boundary; attempting to pass a built container results in a compile error. A factory serves as a recipe that the worker process executes in its own process to build its own container. This ensures that the benchmark does not measure the "warmth" of a container created in the host process. The factory can capture values like connection strings, but it must not return the container itself.
 

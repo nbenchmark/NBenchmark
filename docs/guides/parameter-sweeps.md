@@ -130,7 +130,7 @@ Sort         | 10000 |   18.7 µs |  18.9 µs  |     53,476 | 599.0x            
 ```
 
 Interpret the trend as follows:
-- **Median scaling**: The median scales roughly linearly (e.g., 10 → 100 is 3.76x, 100 → 1000 is 11.9x). This indicates a complexity closer to O(n log n) than O(n²), though with a super-linear constant.
+- **Median scaling**: The median scales roughly linearly (for example, 10 → 100 is 3.76x, 100 → 1000 is 11.9x). This indicates a complexity closer to O(n log n) than O(n²), though with a super-linear constant.
 - **Linear allocation growth**: The `Alloc/op` tracks the input size, which is expected when using `Enumerable.Range(...).ToArray()`.
 - **Ratio against the fastest point**: The `baseline` is `n=10`; every other row shows how many times slower the method is compared to that baseline.
 

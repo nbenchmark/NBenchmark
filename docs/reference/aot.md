@@ -24,7 +24,7 @@ Three parts of the design are reflective, and each is reflective for a reason th
 
 - **Discovery.** Harness mode finds `[Benchmark]` methods by walking an assembly's types. Trimming removes types nothing statically references, which is precisely the set discovery is looking for.
 - **Argument binding.** `[BenchmarkCase]` values are bound to parameters whose types are only known once the method is found, which means constructing generic types and methods at run time.
-- **The worker protocol.** An isolated run moves the body's closure and its prepared state to another process with the reflection-based JSON serializer. Refusing to do that would mean refusing isolation, and isolation is what makes the numbers worth reading.
+- **The worker protocol.** An isolated run moves the body's closure and its prepared state to another process with the reflection-based JSON serializer. Refusing to do that would mean refusing isolation, and isolation is what makes the measurements trustworthy.
 
 The engine's own measurement loop is none of those things. It is the plumbing around it that reflects.
 
@@ -39,13 +39,13 @@ measuring process with the reflection-based JSON serializer, so trimming or AOT 
 can change or break what is measured.
 ```
 
-Two things follow from that. Warnings you see are declared and expected - suppress them with `NoWarn` if you have decided to accept them. Warnings you do not see are a promise: the trim and AOT analyzers run on every NBenchmark build, so an undeclared reflective path is a build break here rather than a surprise in your published app.
+Two things follow from that. Warnings you see are declared and expected - suppress them with `NoWarn` if you have decided to accept them. Warnings you do not see are a promise: the trim and AOT analyzers run on every NBenchmark build, so an undeclared reflective path fails the build rather than failing in your published app.
 
 `NBenchmark` is marked `IsTrimmable`, which is only true because those annotations exist.
 
 ## Single mode under Native AOT
 
-The obvious question is whether the simplest use - `Benchmark.Run(() => ...)` over a non-capturing lambda, measured in this process - survives AOT. Today it does not.
+The obvious question is whether the simplest use - `Benchmark.Run(() => ...)` over a non-capturing lambda, measured in the host process - survives AOT. Today it does not.
 
 The publish succeeds. The run then fails, cleanly:
 
@@ -54,9 +54,9 @@ System.NotSupportedException: 'NBenchmark.Engine.BenchmarkRunner.Run[System.Int3
 native code. MethodInfo.MakeGenericMethod() is not compatible with AOT compilation.
 ```
 
-The body arrives at the engine as a `Delegate` and its result type is recovered at run time, so the typed entry point is reached through `MakeGenericMethod`. That indirection is what keeps a `Func<int>` body from being measured through a `Func<object>` adapter, which would box every return value and charge you an allocation you never wrote. It is a good trade everywhere except here.
+The body arrives at the engine as a `Delegate` and its result type is recovered at run time, so the typed entry point is reached through `MakeGenericMethod`. That indirection avoids measuring a `Func<int>` body through a `Func<object>` adapter, which would box every return value. Under AOT, this is the trade that fails.
 
-This is checked in rather than described: `tests/NBenchmark.AotProbe` publishes with Native AOT and runs the result on every CI build, and the exit code asserts the refusal above. If single mode ever becomes AOT-viable, that probe fails and this page is what gets corrected.
+This behavior is enforced by CI: `tests/NBenchmark.AotProbe` publishes with Native AOT and runs the result on every CI build, and its exit code asserts the refusal above. If single mode ever becomes AOT-viable, that probe fails and this page is corrected in the same change.
 
 ## Single-file publishing
 
@@ -64,5 +64,5 @@ Not supported, and it fails quietly rather than loudly. The measurement worker i
 
 ## See also
 
-- [Isolated runs](../features/isolated-runs.md) - what the worker process does, and what in-process measurement costs you.
+- [Isolated runs](../features/isolated-runs.md) - What the worker process does, and what in-process measurement costs.
 - [Analyzers](./analyzers.md) - the build-time diagnostics that ship in the package.

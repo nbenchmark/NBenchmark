@@ -35,7 +35,7 @@ NBenchmark discards these outliers before computing statistics using a rule that
 
 For more information, see [Outlier trimming](../statistics/outliers.md), which covers the five trimming modes, the bimodal warning, and custom detectors.
 
-## Median vs. Mean
+## Median vs mean
 
 - **Median**: The middle value when measurements are sorted. The median is robust because a few slow measurements do not significantly affect it. When comparing two benchmarks, the median is the most reliable single number.
 - **Mean**: The average of all samples. Even after outlier trimming, the mean is more sensitive to skewed distributions than the median. The engine uses the mean to build the confidence interval.

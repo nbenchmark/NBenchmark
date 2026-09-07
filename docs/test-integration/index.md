@@ -38,7 +38,7 @@ public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 ```
 
-If the measured mean exceeds 500,000 ns (500 $\mu$s), the test fails with a message describing the violation.
+If the measured mean exceeds 500,000 ns (500 µs), the test fails with a message describing the violation.
 
 ### Assert pattern for NUnit and MSTest
 
@@ -96,7 +96,7 @@ public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 ```
 
-The test fails when the slowdown is both statistically significant and practically meaningful (i.e., the ratio exceeds `MaxSlowdownRatio`). Whether a result is "real" depends on whether the test uses replicates - see [replicates and the paired ratio](#replicates-and-the-paired-ratio). With the default single launch, the ratio is the candidate median divided by the reference median, and NBenchmark uses a Mann-Whitney U p-value below the significance level. A significant but small slowdown passes as noise, and a large but noisy slowdown passes due to insufficient evidence.
+The test fails when the slowdown is both statistically significant and practically meaningful (that is, the ratio exceeds `MaxSlowdownRatio`). Whether a result is "real" depends on whether the test uses replicates - see [replicates and the paired ratio](#replicates-and-the-paired-ratio). With the default single launch, the ratio is the candidate median divided by the reference median, and a slowdown counts as "real" when the Mann-Whitney U p-value is below the significance level. A significant but small slowdown passes as noise, and a large but noisy slowdown passes due to insufficient evidence.
 
 If a slowdown breaches the gate, the failure output includes ratio and significance details (`ratio`, `p`, and Cliff's delta). To tune this, start with a loose value (such as `MaxSlowdownRatio = 10.0`) and tighten it based on several runs in your CI environment.
 
@@ -138,7 +138,7 @@ The following table shows how the gate changes when an interval exists:
 
 | Metric | `LaunchCount = 1` (default) | `LaunchCount >= 2` |
 |---|---|---|
-| Ratio gated on | Candidate mean / reference mean | Geometric mean of per-launch ratios |
+| Ratio gated on | Candidate median / reference median | Geometric mean of per-launch ratios |
 | "Is the difference real?" | Mann-Whitney U on pooled samples | Does the interval exclude `1.00x`? |
 | Worker launches | One | One per replicate (pair shares each) |
 | Test output | mean, P95, allocations, samples | Above, plus a `Launches:` line with the run-to-run spread |
@@ -172,7 +172,7 @@ The `PerformanceThresholds` option bag used by `BenchmarkAssert.Validate` is an 
 | `MaxMedianNs` | `double` | `Unset` (-1, disabled) | Maximum allowed median execution time in nanoseconds. The median is always computed, so this gate needs no percentile configuration. |
 | `MaxP95Ns` | `double` | `Unset` (-1, disabled) | Maximum allowed 95th-percentile execution time in nanoseconds. Requires P95 to be in `MeasurementOptions.ReportedPercentiles`. |
 | `MaxAllocatedBytes` | `long` | `UnsetBytes` (-1, disabled) | Maximum allowed mean allocated bytes per operation. Implicitly enables `MeasureAllocations`. |
-| `MaxSlowdownRatio` | `double` | `Unset` (-1, disabled) | Maximum allowed slowdown relative to a calibration benchmark or `ReferenceMethod`. Set to a positive value to enable regression checking (e.g., `5.0` = 5$\times$ the calibration time). The test fails only when the slowdown is both statistically significant and exceeds this ratio. |
+| `MaxSlowdownRatio` | `double` | `Unset` (-1, disabled) | Maximum allowed slowdown relative to a calibration benchmark or `ReferenceMethod`. Set to a positive value to enable regression checking (for example, `5.0` = 5x the calibration time). The test fails only when the slowdown is both statistically significant and exceeds this ratio. |
 | `ReferenceMethod` | `string?` | null | Name of a method on the same class to use as the reference. When null, calibration mode runs. |
 | `Samples` | `int` | `AutoSampleCount` (0) | Number of measured samples. `0` uses the framework default. |
 | `WarmupSamples` | `int` | `AutoSampleCount` (0) | Number of warmup samples. `0` uses the framework default. |
@@ -217,7 +217,7 @@ To relax absolute thresholds for jitter on shared CI runners, set `MaxAbsoluteTh
 public void ParseJson() => JsonSerializer.Deserialize<MyDto>(Payload);
 ```
 
-If NBenchmark detects a shared runner or high-jitter host, the effective threshold becomes $500,000 \times 1.25 = 625,000$ ns. On a dedicated host, the original 500,000 ns threshold applies.
+If NBenchmark detects a shared runner or high-jitter host, the effective threshold becomes 500,000 x 1.25 = 625,000 ns. On a dedicated host, the original 500,000 ns threshold applies.
 
 ## Per-framework reference
 

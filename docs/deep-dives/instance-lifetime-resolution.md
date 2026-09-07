@@ -12,7 +12,7 @@ The [State isolation](../features/state-isolation.md) page describes the user-fa
 
 `Engine/InstanceIndependence` determines the benchmark instance lifetime based on several factors: the declared lifetime, whether the class implements `IStateReset`, whether it uses `[SharedState]`, and whether instances are provided by a container. If a class is marked as `PerClass` but its instances are resolved by a container or factory, and it doesn't declare a specific lifetime, the engine resolves it to `PerMethod` and attaches the reason to the results.
 
-The engine determines the lifetime and the measuring process in the same logic path. The global in-process guard returns before the lifetime rule executes, making the rule unreachable for runs that cannot isolate. The rule only triggers for harnesses without an instance source, meaning it executes where dependence is impossible and not when a container provides scoped objects, such as a `DbContext`. This logic is split between `InstanceIndependence.ResolveLifetime` and `BenchmarkHarness.ResolveGranularity`.
+The engine determines the lifetime and the measuring process through one entry path, but the logic lives in two functions: `InstanceIndependence.ResolveLifetime` and `BenchmarkHarness.ResolveGranularity`. The global in-process guard returns before the lifetime rule executes, making the rule unreachable for runs that cannot isolate. The rule only triggers for harnesses without an instance source, meaning it executes where dependence is impossible and not when a container provides scoped objects, such as a `DbContext`.
 
 ## Propagating the lifetime decision
 
@@ -20,7 +20,7 @@ The engine transmits the resolved lifetime as `RunGroupPayload.InstanceLifetimeO
 
 The coordinator evaluates the rule once because `DiscoveredGroupExecutor` is a single implementation. Evaluating the rule twice could lead to inconsistent results. If an isolated run and an in-process run differ due to instance lifetime, the difference is unrelated to the process boundary.
 
-Both `DiscoveredGroupExecutor` and the coordinator's in-process path can raise dependence warnings. This ensures that shared instances are flagged regardless of where they were measured, including paths that a default harness run doesn't use.
+Both `DiscoveredGroupExecutor` and the coordinator's in-process path can raise dependence warnings, so shared instances are flagged on both paths, including the coordinator's in-process path, which a default harness run never takes.
 
 ## Independence across multiple launches
 

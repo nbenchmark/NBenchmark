@@ -76,7 +76,7 @@ GC behavior: natural (no per-sample GC, no between-benchmark GC, alloc tracking 
 3 benchmark(s) · 0.0s total · CI 95%
 ```
 
-Following the **Interpretation** section, `ConsoleReporter` prints a grey `auto-tuned: …` line per benchmark. This line summarizes what the [adaptive measurement loop](../statistics/measurement.md#the-measurement-loop) resolved: the measured-sample count, operations-per-sample (K), warmup length, and the achieved CI half-width. Pinned runs still show this line with the counts you set.
+Following the **Interpretation** section, `ConsoleReporter` prints a gray `auto-tuned: …` line per benchmark. This line summarizes what the [adaptive measurement loop](../statistics/measurement.md#the-measurement-loop) resolved: the measured-sample count, operations-per-sample (K), warmup length, and the achieved CI half-width. Pinned runs still show this line with the counts you set.
 
 The **Interpretation** section provides omnibus/significance context, the outlier mode, effect-metric semantics, and the GC behavior. If warnings exist, NBenchmark displays them in a separate **Warnings** section below the auto-tune lines. The final summary line shows the benchmark count, total run time, and confidence interval.
 

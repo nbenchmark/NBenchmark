@@ -111,9 +111,9 @@ When using auto mode, NBenchmark resolves warmup length, measured-sample count, 
 
 | Flag | Description |
 | --- | --- |
-| `--reporter <type>` | Add a reporter by name (e.g., `json`, `markdown`, `csv`, `console`). Repeatable. |
+| `--reporter <type>` | Add a reporter by name (such as `json`, `markdown`, `csv`, `console`). Repeatable. |
 | `--output <directory>`, `-o` | Set the output directory for file reporters. Must be under the CWD. A reporter you constructed with a directory of its own keeps it. |
-| `--no-color` | Print without colour or styling. A non-empty `NO_COLOR` environment variable does the same, and `--no-color` sets it for the process so worker output follows. |
+| `--no-color` | Print without color or styling. A non-empty `NO_COLOR` environment variable does the same, and `--no-color` sets it for the process so worker output follows. |
 | `--detail <level>` | Set the report detail level (`simple`, `standard`, `advanced`). Default: `simple`. |
 | `--no-histogram` | Disable latency histogram computation. |
 | `--full-raw-samples` | Return every raw sample from isolated workers instead of a representative subset. |
@@ -133,7 +133,7 @@ When using auto mode, NBenchmark resolves warmup length, measured-sample count, 
 | Flag | Description |
 | --- | --- |
 | `--cpu-affinity <list>` | Pin the process and measuring thread to specific logical CPU cores. |
-| `--priority <level>` | Request a process priority (e.g., `high`, `normal`, `idle`). |
+| `--priority <level>` | Request a process priority (such as `high`, `normal`, `idle`). |
 | `--no-thread-control` | Disable thread-level OS controls (affinity, priority, QoS). |
 | `--host-quality-warnings` | Warn if the host environment looks noisy or shared. |
 
@@ -164,7 +164,7 @@ When using auto mode, NBenchmark resolves warmup length, measured-sample count, 
 | `0` | The run completed successfully. Errored benchmarks are recorded but are not fatal. |
 | `1` | A fatal error occurred. This includes argument parsing errors (unknown flags, out-of-range values), invalid formats, or a benchmark exceeding the `--max-regression-percent` limit. |
 
-When exit code `1` is set during argument parsing, the run still completes to allow you to see the results, but the non-zero code ensures CI pipelines catch the issue.
+When exit code `1` is set during argument parsing, the run still completes so you can see the results, but the non-zero code ensures CI pipelines catch the issue.
 
 ## Examples
 

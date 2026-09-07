@@ -60,7 +60,7 @@ For more information, see [Descriptive Statistics: Mean](../statistics/descripti
 ### Error
 The margin of error on the mean at the configured confidence level (default 95%). It is shown as `±X (Y%)`, where X is the absolute margin in nanoseconds and Y is the margin as a percentage of the mean.
 
-- **Small Error (e.g., under 1%)**: The mean is precisely estimated.
+- **Small Error (for example, under 1%)**: The mean is precisely estimated.
 - **Large Error**: Your measurements are highly variable.
 
 In auto-sampling mode, NBenchmark collects samples until the error meets the precision target. Therefore, a wide interval usually indicates genuine run-to-run variability rather than an insufficient number of samples.
@@ -90,7 +90,7 @@ For more information, see [Descriptive Statistics: Percentiles](../statistics/de
 The speed relative to the baseline. A ratio of `0.75x` means the implementation is 25% faster, while `2.0x` means it is twice as slow. The baseline is either the benchmark you designated with `WithBaseline` or the fastest benchmark in the group.
 
 #### `n/a` in the Ratio column
-The engine only calculates ratios between rows measured under the same runtime configuration. If a row was measured differently (for example, a `[Isolation(Isolation.Off)]` benchmark in a table of isolated ones), the ratio reads `n/a`. An **Iso** column will indicate which rows were isolated.
+The engine only calculates ratios between rows measured under the same runtime configuration. If a row was measured differently (for example, a `[Isolation(Isolation.Off)]` benchmark in a table of isolated ones), the ratio reads `n/a`. An **Iso** column indicates which rows were isolated.
 
 Runtime configuration significantly impacts small measurements. Because an in-process reading and an isolated reading of the same body can differ substantially, a ratio spanning them would report the configuration difference rather than the code difference. Compare rows measured using the same method, or remove `[Isolation(Isolation.Off)]` so the entire group is isolated. For more information, see [Isolated runs](../features/isolated-runs.md).
 
@@ -103,8 +103,8 @@ Runtime configuration significantly impacts small measurements. Because an in-pr
 | (blank) | The benchmark is the baseline, or significance was not tested (fewer than 2 samples in a group). |
 
 **Recommendations:**
-- If you see a **✓** with a small Ratio (e.g., `1.01x`), the difference is statistically real but may be too small to matter. Check the Magnitude column.
-- If you see an **✗** with a large Ratio (e.g., `1.5x`), the measurements are too noisy to be conclusive. Try reducing noise (see [Tuning for noisy CI](../guides/tuning-recipes.md#tuning-for-noisy-ci-environments)) or collecting more samples.
+- If you see a **✓** with a small Ratio (for example, `1.01x`), the difference is statistically real but may be too small to matter. Check the Magnitude column.
+- If you see an **✗** with a large Ratio (for example, `1.5x`), the measurements are too noisy to be conclusive. Try reducing noise (see [Tuning for noisy CI](../guides/tuning-recipes.md#tuning-for-noisy-ci-environments)) or collecting more samples.
 
 For more information, see [Significance Testing](../statistics/significance.md).
 
@@ -122,7 +122,7 @@ The sign convention is as follows: a positive value indicates the candidate is s
 
 A statistically significant result (**✓**) with a Negligible magnitude means the difference is real but likely insignificant in practice. Focus on results with Small, Medium, or Large magnitudes.
 
-For more information, see [Significance Testing: Cliff's Delta](../statistics/significance.md#technical-detail-cliffs-delta).
+For more information, see [significance testing and effect size](../statistics/significance.md#technical-detail-cliffs-delta).
 
 ### Alloc/op
 The mean heap allocation per operation. Zero allocations in the hot path typically result in less GC pressure and more predictable latency. If you see unexpected allocations, check for value type boxing, LINQ overhead, or string formatting in the measured code.
@@ -145,7 +145,7 @@ auto-tuned: K=64, warmup=12, samples=47, CI half-width=1.8%, jitter=0.03
 | CI half-width | The achieved confidence interval half-width when sampling stopped. |
 | jitter | The pre-flight jitter metric (lower is better; < 0.05 indicates a quiet host). |
 
-If the jitter metric is high (e.g., > 0.10) and the outlier detector was auto-switched, the engine provides a warning explaining the switch.
+If the jitter metric is high (for example, above 0.10) and the outlier detector was auto-switched, the engine provides a warning explaining the switch.
 
 For more information, see [Measurement: The measurement loop](../statistics/measurement.md#the-measurement-loop).
 
@@ -170,7 +170,7 @@ For more information, see [Outlier Trimming: Bimodal-distribution warning](../st
 
 ## Operations per second (Ops/s)
 
-Operations per second is derived from the mean timing. `MedianNs ops/s` is derived from the median. These metrics are useful for throughput-oriented comparisons.
+Operations per second is derived from the mean timing. `Median ops/s` is derived from the median. These metrics are useful for throughput-oriented comparisons.
 
 ## When to trust the numbers
 

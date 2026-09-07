@@ -14,7 +14,7 @@ Each control applies at one of two scopes:
 - **Process scope**: Covers the measuring process and every thread in it, including the runtime's own threads.
 - **Thread scope**: Covers only the thread where the measurement loop runs.
 
-These scopes are complementary rather than alternatives. Pinning a process doesn't stop its finalizer, background GC, or JIT threads from sharing the pinned core. Additionally, the process-level call doesn't exist on macOS.
+These scopes are complementary, not alternatives. Pinning a process doesn't stop its finalizer, background GC, or JIT threads from sharing the pinned core. Additionally, the process-level call doesn't exist on macOS.
 
 ## CPU affinity
 
@@ -91,7 +91,7 @@ new BenchmarkSuite("MySuite")
 
 The host probe doesn't label every Mac a shared runner. It reads the performance/efficiency core split where the platform reports one and notes that frequency scaling and thermal throttling remain unobservable from managed code.
 
-On Apple Silicon, cores are not interchangeable. An M1 max reports 10 logical CPUs, of which 8 are performance cores and 2 are efficiency cores. NBenchmark reads this split (`hw.nperflevels` and `hw.perflevelN.logicalcpu`) and reports it in the host guidance:
+On Apple Silicon, cores are not interchangeable. An M1 Max reports 10 logical CPUs, of which 8 are performance cores and 2 are efficiency cores. NBenchmark reads this split (`hw.nperflevels` and `hw.perflevelN.logicalcpu`) and reports it in the host guidance:
 
 ```
 Dedicated-host guidance:

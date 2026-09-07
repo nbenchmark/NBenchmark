@@ -57,7 +57,7 @@ Only replication across processes can measure this. Run `--launch-count 5` (or m
 
 To reduce this spread, use [environment controls](./features/environment-control.md) for CPU affinity and process priority, or use a quieter, less thermally constrained host. CPU affinity is unavailable on macOS. An Apple Silicon laptop with performance and efficiency cores will show more run-to-run spread than a pinned Linux box. NBenchmark requests a performance core when macOS permits it and [reports when it cannot](./features/environment-control.md#macos-and-apple-silicon).
 
-### Tight error with max ceiling stop or high max values
+### Tight Error next to a `maxCeiling` stop, or a Max hundreds of times the median
 
 > [!CAUTION] Pick one
 > - **Accept the variance as the finding:** Use `--launch-count 5` to get an honest signal of run-to-run spread across launches.
@@ -69,7 +69,7 @@ Read `autoTune.sampleStop` before the Error column. A tight margin is evidence t
 
 For more information, see [Raw vs. trimmed statistics](./statistics/measurement.md#raw-vs-trimmed-statistics).
 
-### Result reports a drift unresolved stop
+### Result reports a `driftUnresolved` stop
 
 > [!CAUTION] Pick one
 > - **Land the transition during warmup instead:** Raise `--min-warmup-time <ms>` (the default is 500 ms).
@@ -128,7 +128,7 @@ For more information, see [Outlier Trimming: Bimodal-distribution warning](./sta
 ### Samples confirmed preempted by the OS
 
 > [!CAUTION] Quick fix
-> 1. **Read this as good news.** These samples were removed based on direct evidence (the measuring thread's own CPU occupancy), not inferred from the timing. The reported numbers are more trustworthy because these samples were removed.
+> 1. **Read this as good news.** These samples were removed based on direct evidence (the measuring thread's own CPU occupancy), not inferred from the timing. The reported numbers are more trustworthy for having them gone.
 > 2. **If the rejected fraction is high** ("this host is too noisy to trust"), move to a less noisy host or re-run once background load clears.
 
 This is [evidence-based interference rejection](./statistics/outliers.md#evidence-based-interference-rejection). This pre-stage runs before the statistical outlier detector and discards a sample only when the OS is known to have preempted it. The confirmed preempted and statistical outlier counts are reported together.
@@ -137,7 +137,7 @@ This is on by default and requires no action on a normal run. To use only the st
 
 For more information, see [Outlier Trimming: Evidence-based interference rejection](./statistics/outliers.md#evidence-based-interference-rejection).
 
-### Interference disabled reason is set
+### `InterferenceDisabledReason` is set
 
 > [!CAUTION] Quick fix
 > This is informational, not an error. Timings are unaffected.
@@ -204,7 +204,7 @@ For more information, see [Harness mode: listing benchmarks without running](./u
 > [!CAUTION] Pick one
 > - **Add a public parameterless constructor** to the benchmark class.
 > - **Check your build output for NB0001** (missing parameterless constructor). The analyzer ships with `NBenchmark`, so the diagnostic is already there.
-> - **Use dependency injection:** Add the `NBenchmark.DependencyInjection` package and use `UseDependencyInjection<T>(BuildServices)` with a static `IServiceProvider BuildServices()` factory.
+> - **Use dependency injection:** Add the `NBenchmark.DependencyInjection` package and use `AddFromAssembly<T>().WithServices(BuildServices)` with a static `IServiceProvider BuildServices()` factory.
 
 The host uses `Activator.CreateInstance`, which requires a public parameterless constructor. Benchmark classes with real dependencies (such as a repository, a logger, an `HttpClient`, or a `DbContext`) require the DI companion package.
 
@@ -242,7 +242,7 @@ For more information, see [Isolated Runs](./features/isolated-runs.md#when-isola
 
 Benchmarks in a `Microsoft.NET.Sdk.Web` (or WinForms/WPF) project depend on shared frameworks like `Microsoft.AspNetCore.App` or `Microsoft.WindowsDesktop.App`. These are supplied by the process rather than the output directory. The measurement worker is a plain console application that only supplies `Microsoft.NETCore.App` by default.
 
-NBenchmark extends the framework set automatically by reading the `runtimeconfig.json` beside the assembly under test. `dotnet benchmark` also performs this action.
+NBenchmark extends the framework set automatically by reading the `runtimeconfig.json` beside the assembly under test. `dotnet benchmark` does the same for itself - unlike every other mode, it loads the target into its own process to discover benchmarks.
 
 Two cases may still cause failure:
 - **Missing or stale `runtimeconfig.json`:** Rebuild the project.

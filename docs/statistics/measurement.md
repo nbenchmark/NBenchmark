@@ -39,7 +39,7 @@ The target is derived from two factors:
 | Apple Silicon | ~41.7 ns | ~21 µs | ~0.19% |
 | Windows QPC | ~100 ns | ~51 µs | ~0.19% |
 
-NBenchmark only raises the target; if you provide a higher preset (such as the `Thorough` profile, which uses 50 µs), the preset is honored. Bodies that already span the resolved target keep K = 1. For more information, see [Timer resolution](#timer-resolution).
+NBenchmark only raises the target; if you provide a higher preset (such as the `Thorough` preset, which uses 50 µs), the preset is honored. Bodies that already span the resolved target keep K = 1. For more information, see [Timer resolution](#timer-resolution).
 
 > [!NOTE] K > 1 batches change percentile meaning
 > When K > 1, each recorded sample is the mean of K back-to-back operations. Therefore, P95/P99/max and the histogram describe **batch means**, not individual-operation tails. For bodies under 10 µs, this trade-off is deliberate because per-op timing at that scale is dominated by timer noise. If you need per-op tail latency, pin `OpsPerSample = 1` and see [Descriptive Statistics](./descriptive.md) for relevant caveats.
@@ -93,16 +93,16 @@ Two gates ensure the stop rule is honest:
 > - **Land the transition during warmup:** Increase `--min-warmup-time <ms>` (default 500) so that a JIT tier-up or dynamic-PGO re-optimization occurs during warmup.
 > - **Accept non-stationarity:** Use `--launch-count 5` to measure the across-launch spread, which is the honest signal for a body without a steady state.
 
-This gate prevents a benchmark from appearing trustworthy (e.g., a tight error bar) when a step change - such as a JIT tier-up or thermal ramp - occurs mid-measurement. If the gate refuses a stop, the loop discards all samples collected so far and restarts measurement, up to `AutoTune.MeasurementRestartLimit` times (default 2). Restarts use the same `MaxTuningTime` budget. If the limit is exhausted, NBenchmark reports `SampleStopReason.DriftUnresolved` with a warning.
+This gate prevents a benchmark from appearing trustworthy (for example, showing a tight error bar) when a step change - such as a JIT tier-up or thermal ramp - occurs mid-measurement. If the gate refuses a stop, the loop discards all samples collected so far and restarts measurement, up to `AutoTune.MeasurementRestartLimit` times (default 2). Restarts use the same `MaxTuningTime` budget. If the limit is exhausted, NBenchmark reports `SampleStopReason.DriftUnresolved` with a warning.
 
 You can disable the gate by setting the tolerance to `0`. `BenchmarkResult.AutoTune.SplitHalfDrift` records the gap for every stop. See [The measurement engine: the drift gate and the cap](../deep-dives/measurement-engine.md#the-drift-gate-and-the-cap) for the implementation.
 
-`AutoTune.MaxSamples` defaults to **5,000** (2,000 under `Quick`, 20,000 under `Thorough`). At 5,000 the CI rule still reaches ±2.5% for any body with a coefficient of variation up to roughly 90%. Past that the required count grows as `(t × CV / target)²` and runs away - a CV of 580% needs about 50,000 samples just to reach ±5% - but a body that noisy has variance that *is* the finding, and more samples only buy a tighter interval around an unstable centre. The ceiling warning therefore names the measured CV and the count convergence would actually take, and points at `--launch-count` as a more honest signal.
+`AutoTune.MaxSamples` defaults to **5,000** (2,000 under `Quick`, 20,000 under `Thorough`). At 5,000 the CI rule still reaches ±2.5% for any body with a coefficient of variation up to roughly 90%. Past that the required count grows as `(t × CV / target)²` and runs away - a CV of 580% needs about 50,000 samples just to reach ±5% - but a body that noisy has variance that *is* the finding, and more samples only buy a tighter interval around an unstable center. The ceiling warning therefore names the measured CV and the count convergence would actually take, and points at `--launch-count` as a more honest signal.
 
 When the cap fires before `AutoTune.MinSamples` is reached, the loop keeps sampling up to `AutoTune.MaxTuningTime × AutoTune.CapGraceFactor` (default 1.5×). This trades a longer run for enough samples to be meaningful. If the grace ceiling is reached below `MinSamples`, a warning flags the error margin as unreliable.
 
 Each measured sample performs the following:
-1. If `ForceGcBeforeEachSample` is true (`PerSampleCollect` GC behavior), it forces a gen-0 collection before the timestamp.
+1. Forces a gen-0 collection before the timestamp if `ForceGcBeforeEachSample` is true (`PerSampleCollect` GC behavior).
 2. Calls `SampleSetup` if provided.
 3. Records `Stopwatch.GetTimestamp()`.
 4. Invokes the benchmark action K times.
@@ -143,13 +143,13 @@ Every measured result carries an `AutoTune` diagnostic (`BenchmarkResult.AutoTun
 
 Reporters display this as an `auto-tuned: ...` line (console, Markdown), dedicated columns (CSV advanced), or an `autoTune` object (JSON).
 
-The diagnostic also records `WarmupTimeFloorMet` (if measured before tiered compilation finished) and `SampleQuantizationFraction` (if measured more finely than the timer can resolve). Neither is visible in the margin of error.
+The diagnostic also records `WarmupTimeFloorMet` (which covers a body measured before tiered compilation finished) and `SampleQuantizationFraction` (which covers a body measured more finely than the timer can resolve). Neither is visible in the margin of error.
 
 ### The warmup curve
 
-The [warmup gates](#phase-b---warmup-plateau-detection) decide *when* warmup ends. The `AutoTune.WarmupCurve` diagnostic records the mean per-op time of each warmup batch (oldest first), showing tier-0 $\rightarrow$ tier-1 promotions and instrumented $\rightarrow$ optimized transitions under dynamic PGO.
+The [warmup gates](#phase-b---warmup-plateau-detection) decide *when* warmup ends. The `AutoTune.WarmupCurve` diagnostic records the mean per-op time of each warmup batch (oldest first), showing tier-0 -> tier-1 promotions and instrumented -> optimized transitions under dynamic PGO.
 
-Related fields include `JitLastChangeAtNs` (when the compiled-method count last moved) and `WarmupJit*` counters. The `WarmupJit*` counters are process-wide. In an in-process run, the first benchmark typically absorbs the bulk of startup compilation. Because [benchmarks run in random order by default](../faq.md#can-i-run-benchmarks-in-source-order-instead-of-random-order), this causes warmup to differ between runs.
+Related fields include `JitLastChangeAtNs` (when the compiled-method count last moved) and `WarmupJit*` counters. The `WarmupJit*` counters are process-wide. In an in-process run, the first benchmark typically absorbs the bulk of startup compilation. Because [benchmarks run in random order by default](../faq.md#can-i-run-benchmarks-in-source-order-instead-of-random-order), warmup differs between runs.
 
 Use `--order declaration` (or `--seed` for a reproducible shuffle) to ensure JIT costs occur in the same place every time. For a full field reference, see the [JSON reporter's `autoTune` object](../output/json-reporter.md#the-autotune-object).
 
@@ -160,7 +160,7 @@ NBenchmark provides two GC behaviors to control how GC interacts with the loop:
 - **`Natural`** (the default): No per-sample Gen0 GC and no pre-measurement full GC. Numbers reflect production behavior, including natural GC pauses and CPU cache effects.
 - **`PerSampleCollect`** (opt-in): Forces Gen0 GC before every sample and runs a full GC after warmup. This is useful for pure-CPU measurements, cryptographic algorithms, or numeric kernels.
 
-Both profiles include a full GC between benchmarks and allocation tracking. You can disable these with `--no-gc-between-benchmarks` or `--no-allocations`.
+Both GC behaviors include a full GC between benchmarks and allocation tracking. You can disable these with `--no-gc-between-benchmarks` or `--no-allocations`.
 
 ### Worked example
 
@@ -175,7 +175,7 @@ BenchmarkSuite.Create("AllocPressure")
 - Under the **Natural** GC behavior, variance (CV%) is high, and some samples show Gen0-GC stalls. The `Alloc/op` column shows the allocation pressure.
 - Under the **PerSampleCollect** GC behavior (`--gc per-sample-collect`), variance is low and numbers are tightly clustered. The `Alloc/op` column still shows 100 KiB/op, as allocation tracking remains enabled.
 
-### Setting the profile
+### Setting the GC behavior
 
 **In code (BenchmarkHarness):**
 ```csharp
@@ -208,10 +208,10 @@ options with { ForceGcBeforeEachSample = true }
 // Inherit the warmup heap under PerSampleCollect (skip the pre-measurement GC)
 options with { ForceGcBeforeMeasurement = false }
 
-// Disable allocation tracking (both profiles)
+// Disable allocation tracking (both GC behaviors)
 options with { MeasureAllocations = false }
 
-// Disable the between-benchmark GC (both profiles)
+// Disable the between-benchmark GC (both GC behaviors)
 options with { ForceGcBetweenBenchmarks = false }
 ```
 
@@ -241,7 +241,7 @@ Per-sample timings are computed from raw `Stopwatch` ticks - not via `TimeSpan` 
 
 ## The host drift canary
 
-Standard drift checks look inside a single benchmark's sample stream. However, host-level noise (e.g., a laptop warming up or a CI co-tenant) can affect every subsequent benchmark, making comparisons between rows unreliable even if each row is internally consistent.
+Standard drift checks look inside a single benchmark's sample stream. However, host-level noise (such as a laptop warming up or a CI co-tenant) can affect every subsequent benchmark, making comparisons between rows unreliable even if each row is internally consistent.
 
 NBenchmark measures the machine by running a fixed, deterministic control workload at every benchmark boundary: once before the first benchmark, once after each one, and once after the last.
 
@@ -250,7 +250,7 @@ Each result carries readings in `BenchmarkResult.HostTimeline`:
 | Field | Description |
 | --- | --- |
 | `BeforeNs` / `AfterNs` | Absolute nanoseconds of the bracketing work. Only their ratios are meaningful. |
-| `RelativeToRunStart` | The bracketing mean as a multiple of the first reading (e.g., `1.07` means work took 7% longer). |
+| `RelativeToRunStart` | The bracketing mean as a multiple of the first reading (for example, `1.07` means work took 7% longer). |
 | `CompletedBenchmarks` | Number of completed benchmarks when this one started. |
 
 Compare `RelativeToRunStart` between rows. If the difference between a benchmark and the baseline is **smaller than the distance the host moved between measurements**, NBenchmark emits a warning:
@@ -271,4 +271,4 @@ The canary costs a fraction of a millisecond and does not affect accuracy. It is
 
 The adaptive loop, [outlier trimming](./outliers.md), and [significance testing](./significance.md) manage OS noise statistically. [Evidence-based interference rejection](./outliers.md#evidence-based-interference-rejection) is the exception: it reads the thread's CPU occupancy and discards samples the OS is *known* to have preempted. This is enabled by default; disable it with `--no-interference-filter`.
 
-To reduce noise baked into every sample (e.g., thread migration), use **environment controls** - CPU affinity, process priority, and thread placement. See [Environment control](../features/environment-control.md) for details.
+To reduce noise baked into every sample (such as thread migration), use **environment controls** - CPU affinity, process priority, and thread placement. See [Environment control](../features/environment-control.md) for details.

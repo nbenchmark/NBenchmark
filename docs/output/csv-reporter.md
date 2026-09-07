@@ -58,17 +58,17 @@ When you provide an explicit `fileName`, subsequent calls to `ReportAsync` overw
 
 ## Output format
 
+Simple detail emits the following columns. Each data row carries a `MeasurementEpoch` of `7`:
+
 ```csv
 ClassName,Name,MedianNs,OpsPerSecond,Ratio,Significant,AllocPerOp,Gen0,Gen1,Gen2,SchemaVersion,MeasurementEpoch,Detail,GcBehavior,RuntimeProfile,RuntimeKnobs,ThreadControl,InterferenceFilter,Isolation
-
-Each row contains a `MeasurementEpoch` of `7`:
 "SortingBenchmarks","Compute",300.0,3636363.6,0.75,"true",96,12,3,0,2,7,simple,natural,steady-state,"",true,true,"isolated"
 "SortingBenchmarks","Baseline",400.0,2660985.4,1.00,"",120,11,2,0,2,7,simple,natural,steady-state,"",true,true,"isolated"
 ```
 
 NBenchmark records all timing values in **nanoseconds**.
 
-Percentile columns (such as P95, P99, etc.) are dynamic. They appear only in Standard and Advanced modes when you configure the corresponding percentiles via `MeasurementOptions.ReportedPercentiles` or the `--percentiles` CLI flag. With the default set (`[0.50, 0.95, 0.99, 0.999, 1.0]`), NBenchmark emits columns P95 and P99. P50 and max (1.0) are excluded from percentile columns because they appear separately as median and max. Empty cells indicate that the percentile was not configured or the row errored.
+Percentile columns (such as P95, P99, etc.) are dynamic. They appear only in Standard and Advanced detail when you configure the corresponding percentiles via `MeasurementOptions.ReportedPercentiles` or the `--percentiles` CLI flag. With the default set (`[0.50, 0.95, 0.99, 0.999, 1.0]`), NBenchmark emits columns P95 and P99. P50 and max (1.0) are excluded from percentile columns because they appear separately as median and max. Empty cells indicate that the percentile was not configured or the row errored.
 
 The `EffectMetric`, `EffectValue`, and `Magnitude` columns reflect the active significance strategy's output. For built-in Mann-Whitney tests:
 
@@ -100,9 +100,9 @@ The `EffectMetric`, `EffectValue`, and `Magnitude` columns reflect the active si
 | `InterferenceFilter` | `true` / `false` | Whether the evidence-based interference rejection filter was enabled. |
 | `Isolation` | string | Isolation status for the row (`isolated`, `in-process`, or a refusal status). |
 
-### Standard mode (dynamic columns)
+### Standard detail (dynamic columns)
 
-Standard mode adds the following columns after the simple columns:
+Standard detail adds the following columns after the simple columns:
 
 | Column | Type | Description |
 | --- | --- | --- |
@@ -117,16 +117,16 @@ Standard mode adds the following columns after the simple columns:
 | `RatioCiLower` | float or empty | Lower bound of the paired per-launch ratio interval. Empty if the run had a single launch. |
 | `RatioCiUpper` | float or empty | Upper bound of the paired per-launch ratio interval. An interval spanning `1.0` means the run cannot distinguish this benchmark from the baseline. |
 | `RatioReplicates` | integer or empty | The number of launches paired to produce the interval. |
-| `P{key}` | float | Dynamic percentile columns (e.g., `P95`, `P99`). Values are in nanoseconds. |
+| `P{key}` | float | Dynamic percentile columns (such as `P95`, `P99`). Values are in nanoseconds. |
 | `EffectMetric` | string or empty | Strategy-defined effect metric name (such as `Cliff's δ`). Empty for the baseline or when significance is not tested. |
 | `EffectValue` | float or empty | Strategy-defined numeric effect value. For Mann-Whitney tests, this is **Cliff's delta** (positive = candidate slower than baseline). See [Cliff's delta](../statistics/significance.md#technical-detail-cliffs-delta). |
 | `Magnitude` | string or empty | Strategy-defined qualitative effect label. For Mann-Whitney tests, this is the [Romano (2006)](https://en.wikipedia.org/wiki/Effect_size) classification of `abs(Cliff's δ)`. |
 | `MarginOfErrorPercent` | float | `MarginOfErrorNs / MeanNs * 100`. |
 | `OutliersRemoved` | integer | Number of samples removed by outlier trimming. |
 
-### Advanced mode (dynamic columns)
+### Advanced detail (dynamic columns)
 
-Advanced mode adds the following columns to the standard set:
+Advanced detail adds the following columns to the standard set:
 
 | Column | Type | Description |
 | --- | --- | --- |
@@ -171,7 +171,7 @@ Advanced mode adds the following columns to the standard set:
 - NBenchmark sorts results by median (fastest first).
 - NBenchmark creates the output directory automatically if it does not exist.
 - For names containing double-quotes, NBenchmark uses standard CSV escaping by doubling the quote character.
-- Simple detail CSV has 19 fixed columns. Standard mode has 35 non-percentile columns plus one per configured tail-latency percentile. Advanced mode adds 35 further fields.
+- Simple detail CSV has 19 fixed columns. Standard detail has 35 non-percentile columns plus one per configured tail-latency percentile. Advanced detail adds 35 further fields.
 
 ## Using with Benchmark (Single mode)
 
