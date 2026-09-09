@@ -27,10 +27,36 @@ namespace NBenchmark.Tests.Workers;
 /// </remarks>
 internal static class FramePipePair
 {
+    /// <summary>
+    ///     How much a test may write before anything reads. Every caller writes a whole frame and
+    ///     then reads it back on one thread, so a frame larger than the pipe holds blocks the write
+    ///     against a reader that cannot run until the write returns, and the test deadlocks.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Stated explicitly because the default is not the same number on every platform, and
+    ///         that is what made this expensive. A Unix pipe holds 64 KB and ignores this argument
+    ///         entirely; a Windows anonymous pipe defaults to about 4 KB. So
+    ///         <c>ObserverSamples_RoundTripsAWholeBatch</c>, whose frame serializes to 12,702 bytes,
+    ///         passed on Linux and macOS and hung forever on Windows - the whole CI job with it.
+    ///     </para>
+    ///     <para>
+    ///         Matching the Unix capacity does not remove the ceiling, it just puts it in one place
+    ///         on every platform. That is the property worth having: a future frame test that
+    ///         outgrows this deadlocks on the machine of whoever writes it, rather than only in
+    ///         Windows CI. If a test legitimately needs a bigger frame, overlap the read with the
+    ///         write rather than raising this - the pipe is bounded at any size.
+    ///     </para>
+    /// </remarks>
+    private const int PipeBufferBytes = 64 * 1024;
+
     public static (FrameChannel Left, FrameChannel Right, IDisposable Cleanup) Create()
     {
-        var leftToRight = new AnonymousPipeServerStream(PipeDirection.Out, HandleInheritability.None);
-        var rightToLeft = new AnonymousPipeServerStream(PipeDirection.In, HandleInheritability.None);
+        var leftToRight = new AnonymousPipeServerStream(
+            PipeDirection.Out, HandleInheritability.None, PipeBufferBytes);
+
+        var rightToLeft = new AnonymousPipeServerStream(
+            PipeDirection.In, HandleInheritability.None, PipeBufferBytes);
 
         var rightInbound = new AnonymousPipeClientStream(
             PipeDirection.In, leftToRight.GetClientHandleAsString());

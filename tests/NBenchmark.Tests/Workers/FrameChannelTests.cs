@@ -543,6 +543,46 @@ public sealed class FrameChannelTests
     }
 
     /// <summary>
+    ///     Every test here writes a whole frame before anything reads it, so the frame has to fit in
+    ///     the pipe. This pins the size that arrangement survives.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The ceiling is a real one and it used to differ by platform: a Unix pipe holds 64 KB,
+    ///         a Windows anonymous pipe defaults to about 4 KB.
+    ///         <see cref="ObserverSamples_RoundTripsAWholeBatch" /> writes 12,702 bytes, which is
+    ///         comfortable on one and a permanent deadlock on the other, and the only symptom was a
+    ///         CI job that went silent. <see cref="FramePipePair" /> now asks for 64 KB, so the two
+    ///         platforms agree on where the cliff is.
+    ///     </para>
+    ///     <para>
+    ///         What this catches, and what it does not. A frame that outgrows 64 KB deadlocks
+    ///         everywhere, so that mistake is reproducible on any machine - it was reproduced on
+    ///         macOS while diagnosing this. Someone lowering the fixture's buffer is a different
+    ///         matter: Unix ignores the argument and pins the capacity at 64 KB whatever is asked
+    ///         for, so no test can detect that locally and this one would only fail on Windows.
+    ///         Treat the constant as review-guarded rather than test-guarded.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public async Task A_Frame_Just_Under_The_Fixture_Buffer_Round_Trips_Before_Anything_Reads()
+    {
+        // Padded to a known size rather than built from a record count, so the number this pins is
+        // the number that matters. Just under 64 KB, leaving room for the envelope and the prefix.
+        var payload = new string('x', 60 * 1024);
+
+        var (left, right, cleanup) = CreatePair();
+        using var _ = cleanup;
+
+        await left.WriteAsync(
+            WorkerFrame.Of(new FaultPayload { Message = payload }), CancellationToken.None);
+
+        var frame = await right.ReadAsync(CancellationToken.None);
+
+        Assert.Equal(payload, frame!.Fault!.Message);
+    }
+
+    /// <summary>
     ///     The coalesced sample stream. Every field has to survive, because the coordinator rebuilds a
     ///     <see cref="SampleEvent" /> from it and hands that to the user's observer as though it had
     ///     been emitted locally - a dropped <c>Warmup</c> flag would silently move warmup samples into

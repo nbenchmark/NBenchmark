@@ -61,3 +61,6 @@ nunit-*.xml
 .idea/
 .vs/
 *.user
+
+
+/tests/NBenchmark.Tests/TestResults
