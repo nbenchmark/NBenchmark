@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Reflection.PortableExecutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
@@ -32,6 +33,20 @@ internal static class SharedReferences
                 if (name is "System.Private.Uri" or "System.Private.Xml")
                     continue;
 
+                // The shared framework directory is not all managed assemblies, and on Windows the
+                // native half wears the same extension: coreclr.dll, clrjit.dll, hostpolicy.dll,
+                // mscordaccore.dll, msquic.dll and friends. On Linux and macOS those are .so and
+                // .dylib, so this glob never saw them and the filter was never missed - which is why
+                // this failed on Windows alone, with thirteen CS0009s from a test that passes
+                // everywhere else.
+                //
+                // The try/catch below cannot stand in for this. CreateFromFile is lazy: it takes the
+                // path without reading it, so a native image is accepted here and only rejected when
+                // the compilation touches its metadata, by which point the error is a compile
+                // diagnostic that the test reads as "the test source did not compile".
+                if (!IsManagedAssembly(dll))
+                    continue;
+
                 try
                 {
                     list.Add(MetadataReference.CreateFromFile(dll));
@@ -45,6 +60,32 @@ internal static class SharedReferences
         }
 
         return _refs;
+    }
+
+    /// <summary>
+    ///     Whether a PE file on disk carries a CLI header, which is what separates a managed
+    ///     assembly from the native libraries sitting beside it in the shared framework.
+    /// </summary>
+    /// <remarks>
+    ///     Asked of the file rather than of its name. A deny-list of the natives that ship today is
+    ///     the obvious alternative and the wrong one: the set changes with every runtime release, and
+    ///     the failure mode when it drifts is thirteen unexplained CS0009s in an unrelated test.
+    /// </remarks>
+    /// <param name="path">Full path to the candidate file.</param>
+    private static bool IsManagedAssembly(string path)
+    {
+        try
+        {
+            using var stream = File.OpenRead(path);
+            using var reader = new PEReader(stream);
+
+            return reader.HasMetadata && reader.PEHeaders.CorHeader is not null;
+        }
+        catch (Exception ex) when (ex is IOException or BadImageFormatException)
+        {
+            // Unreadable or not a PE file at all. Either way it is not a reference.
+            return false;
+        }
     }
 }
 

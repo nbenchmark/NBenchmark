@@ -10,39 +10,68 @@ jobs:
     # NBenchmark carries more platform-conditional code than most libraries - thread affinity,
     # process priority, core topology and the macOS quality-of-service call each have their own
     # path, and the tests branch on the operating system rather than skipping. That is the argument
-    # for testing on more than one operating system, and it is why macOS is here rather than Linux
-    # alone: the quality-of-service call has no other home.
-    #
-    # Windows is *not* here. Its cost is process creation - the isolation suite spawns a
-    # `dotnet exec` measurement worker per test, and that is the one operation where Windows is not
-    # within a small constant of Linux - which put this job at up to two hours against ten minutes
-    # for the other two. It now runs in full, on every framework, in .github/workflows/
-    # nightly-windows.yml, skipped on nights when the branch has not moved. The trade that buys:
-    # a Windows-only break is found within a day rather than at the commit, and does not block a
-    # merge. Deliberate, given the ratio.
-    name: Build and Test (${{ matrix.os }})
+    # for testing on more than one operating system, and it is why macOS and Windows are here rather
+    # than Linux alone: the quality-of-service call and the kernel32 interop have no other home.
+    name: Build and Test (${{ matrix.os }}, ${{ matrix.framework }})
     runs-on: ${{ matrix.os }}
-    # Without a ceiling a wedged worker pipe sits on GitHub's 360-minute default, which is six
-    # hours of a runner to learn one test hung. Both rows finish inside ten minutes, so this is a
-    # stuck-job guard with a wide margin, not a budget.
-    timeout-minutes: 60
+    # The outermost guard, and the least informative one - by the time it fires the run is over and
+    # there is nothing to read. --blame-hang below is what should actually catch a wedged test, at
+    # 5 minutes and with a dump naming it, so this is only here for the failure modes blame cannot
+    # see: a hung restore, a wedged MSBuild node, a runner that stops responding. Every row finishes
+    # inside six minutes, and a single hang adds five.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         include:
-          # The three-framework sweep runs once, on the fastest runner. What the macOS row exists
-          # for is the platform-conditional code above, and none of that varies by target framework,
-          # so running it against net10.0 alone loses no coverage while paying for one framework
-          # rather than three.
+          # One row per (operating system, target framework), and every row tests exactly one
+          # framework. The frameworks used to be a single ubuntu row that tested all three at once,
+          # which was the cheaper-looking arrangement and the wrong one: NBenchmark.Tests turns
+          # xUnit's intra-assembly parallelism off because benchmarks measure wall-clock time and
+          # concurrent tests skew each other, and MSBuild then quietly undid that by running the
+          # three frameworks as three parallel nodes - three copies of the same timing-sensitive
+          # suite measuring simultaneously on a 4-vCPU runner. The contention was measurable: run
+          # together, each framework's own suite took 15-20s longer than it does run alone.
+          #
+          # Serialising the three inside one job fixed the skew and took that row from 4m30s to
+          # 11m30s. Splitting them across three jobs fixes it and leaves each row around 4 minutes,
+          # because they now run on three runners rather than three cores of one. That costs 3x the
+          # ubuntu runner minutes - the cheap ones - and buys back the wall clock on every push.
+          # (Times measured locally, so read them as ratios rather than as runner predictions.)
           - os: ubuntu-latest
-            test-frameworks: ""
+            framework: net8.0
+          - os: ubuntu-latest
+            framework: net9.0
+          - os: ubuntu-latest
+            framework: net10.0
+
+          # net10.0 alone. What the macOS and Windows rows exist for is the platform-conditional
+          # code above, none of which varies by target framework, so a second framework here would
+          # pay for coverage the ubuntu rows already have.
           - os: macos-latest
-            test-frameworks: "--framework net10.0"
+            framework: net10.0
+          - os: windows-latest
+            framework: net10.0
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      # Defender scans every newly launched image and its dependency closure, and the isolation
+      # suite starts a `dotnet exec` measurement worker per test. Process creation is the one
+      # operation where Windows is not within a small constant of Linux, and this is what keeps the
+      # gap to a constant rather than a multiple.
+      - name: Exclude the build tree from Defender
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Add-MpPreference -ExclusionPath "${{ github.workspace }}"
+          Add-MpPreference -ExclusionPath "$env:USERPROFILE\.nuget"
+          Add-MpPreference -ExclusionPath "$env:ProgramFiles\dotnet"
+          Add-MpPreference -ExclusionProcess "dotnet.exe"
+          Add-MpPreference -ExclusionProcess "MSBuild.exe"
+          Add-MpPreference -ExclusionProcess "VBCSCompiler.exe"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
@@ -63,28 +92,87 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
 
+      # Every framework, not just this row's. Several projects are single-target - the analyzers are
+      # netstandard2.0, NBenchmark.Analyzers.Tests is net10.0 - so `--framework` is not a thing the
+      # solution build accepts, and the multi-targeted projects have to produce the fixture and
+      # worker outputs the tests locate by path anyway.
       - name: Build solution
         run: dotnet build --no-restore --configuration Release
 
-      # The TRX is the record of where the time went. A job that times out leaves no summary at
-      # all, and "CI got slower" is not a finding anyone can act on without per-test durations -
-      # which is how the isolation suite was identified as two thirds of this suite's wall clock in
-      # the first place.
-      # No LogFileName: eight test assemblies share one results directory, and a fixed name means
-      # each one overwrites the last, leaving a single project's timings to show for the run.
+      # Project by project rather than one solution-wide `dotnet test`, for two reasons.
+      #
+      # The first is that solution-wide plus `--framework` does not work: the flag is forced onto
+      # every project, and `dotnet test --framework net8.0` exits 1 the moment it reaches
+      # NBenchmark.Analyzers.Tests, which targets net10.0 alone. Selecting the projects that
+      # actually target this row's framework is what lets the net8.0 and net9.0 rows exist.
+      #
+      # The second is that the loop is now what serialises the suite. NBenchmark.Tests measures
+      # wall-clock time with parallelism off, and running another test project beside it puts the
+      # contention straight back.
+      #
+      # Both greps ask the csproj rather than a list here, so a new test project is picked up and
+      # one that drops a framework falls out on its own. The test-SDK reference is what tells the
+      # eight test projects apart from the fixture executables that live beside them.
+      #
+      # --blame-hang is the reason a hang is now a five-minute failure that names a test rather than
+      # a two-hour silence. It writes a sequence file recording the test in flight and dumps the
+      # test host, which is exactly the evidence that was missing when this last happened: the
+      # hanging assembly produced no .trx at all, so the artifact held timings for every project
+      # except the one that mattered. The timeout is per test, against a slowest legitimate test of
+      # about two minutes - HardCrashTests runs its worker under a 2-minute ceiling.
+      #
+      # -maxcpucount:1 is belt and braces now that the loop serialises: one project and one
+      # framework give MSBuild little to parallelise, but it costs nothing and states the intent.
+      #
+      # No LogFileName: the projects share one results directory, and a fixed name would leave a
+      # single project's timings to show for the whole run.
       - name: Run tests
-        run: >
-          dotnet test --no-build --configuration Release --verbosity normal
-          ${{ matrix.test-frameworks }}
-          --logger trx
-          --results-directory ${{ github.workspace }}/TestResults
+        shell: bash
+        env:
+          FRAMEWORK: ${{ matrix.framework }}
+          RESULTS: ${{ github.workspace }}/TestResults
+        run: |
+          set -euo pipefail
 
+          failed=()
+
+          for project in tests/*/*.csproj; do
+            grep -qF "Microsoft.NET.Test.Sdk" "$project" || continue
+            grep -qF "$FRAMEWORK" "$project" || continue
+
+            name=$(basename "$project" .csproj)
+
+            echo "::group::$name ($FRAMEWORK)"
+            if dotnet test "$project" --no-build --configuration Release --verbosity normal \
+                 --framework "$FRAMEWORK" \
+                 -maxcpucount:1 \
+                 --blame-hang --blame-hang-timeout 5m --blame-hang-dump-type full \
+                 --logger trx \
+                 --results-directory "$RESULTS"; then
+              echo "$name ok"
+            else
+              echo "$name FAILED"
+              failed+=("$name")
+            fi
+            echo "::endgroup::"
+          done
+
+          if [ ${#failed[@]} -ne 0 ]; then
+            echo "Test projects that failed: ${failed[*]}"
+            exit 1
+          fi
+
+      # The sequence file is the important one on a hang: a wedged assembly never writes its .trx,
+      # so it is the only thing that names the test that stopped.
       - name: Upload test timings
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: test-results-${{ matrix.os }}
-          path: TestResults/**/*.trx
+          name: test-results-${{ matrix.os }}-${{ matrix.framework }}
+          path: |
+            TestResults/**/*.trx
+            TestResults/**/*Sequence*.xml
+            TestResults/**/*.dmp
           if-no-files-found: warn
 
   aot-probe:

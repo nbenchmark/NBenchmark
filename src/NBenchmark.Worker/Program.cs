@@ -23,13 +23,13 @@ internal static class Program
 {
     public static async Task<int> Main(string[] args)
     {
-        if (!TryParse(args, out var inboundHandle, out var outboundHandle, out var parentPid, out var error))
+        if (!TryParse(args, out var inboundPipe, out var outboundPipe, out var parentPid, out var error))
         {
             Console.Error.WriteLine($"nbworker: {error}");
 
             Console.Error.WriteLine(
-                $"usage: nbworker {WorkerProtocol.InboundHandleArgument} <handle> "
-                + $"{WorkerProtocol.OutboundHandleArgument} <handle> "
+                $"usage: nbworker {WorkerProtocol.InboundPipeArgument} <pipe-name> "
+                + $"{WorkerProtocol.OutboundPipeArgument} <pipe-name> "
                 + $"[{WorkerProtocol.ParentProcessIdArgument} <pid>]");
 
             Console.Error.WriteLine(
@@ -50,13 +50,31 @@ internal static class Program
 
         try
         {
-            using var inbound = new AnonymousPipeClientStream(PipeDirection.In, inboundHandle);
-            using var outbound = new AnonymousPipeClientStream(PipeDirection.Out, outboundHandle);
+            using var inbound = WorkerTransport.CreateClient(inboundPipe, PipeDirection.In);
+            using var outbound = WorkerTransport.CreateClient(outboundPipe, PipeDirection.Out);
+
+            // Sequential rather than concurrent: the coordinator waits for both together, so the
+            // order does not matter, and two awaits read better than a WhenAll whose only job is to
+            // save a few microseconds once per worker.
+            await inbound.ConnectAsync(WorkerProtocol.ConnectTimeout, cts.Token).ConfigureAwait(false);
+            await outbound.ConnectAsync(WorkerProtocol.ConnectTimeout, cts.Token).ConfigureAwait(false);
+
             using var channel = new FrameChannel(inbound, outbound);
 
             var session = new WorkerSession(channel);
 
             return await session.RunAsync(cts.Token).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            // The coordinator named a pipe it never brought up, or died between spawning this
+            // process and accepting it. Distinct from CoordinatorLost below, which is a pipe that
+            // was connected and then went away - this one never connected at all.
+            Console.Error.WriteLine(
+                $"nbworker: the coordinator (pid {parentPid}) did not accept a connection within "
+                + $"{WorkerProtocol.ConnectTimeout.TotalSeconds:0.#}s.");
+
+            return WorkerExitCode.CoordinatorLost;
         }
         catch (Exception ex) when (ex is IOException or ObjectDisposedException)
         {
@@ -78,13 +96,13 @@ internal static class Program
 
     private static bool TryParse(
         string[] args,
-        out string inboundHandle,
-        out string outboundHandle,
+        out string inboundPipe,
+        out string outboundPipe,
         out int parentPid,
         out string? error)
     {
-        inboundHandle = "";
-        outboundHandle = "";
+        inboundPipe = "";
+        outboundPipe = "";
         parentPid = 0;
         error = null;
 
@@ -102,12 +120,12 @@ internal static class Program
 
             switch (name)
             {
-                case WorkerProtocol.InboundHandleArgument:
-                    inboundHandle = value;
+                case WorkerProtocol.InboundPipeArgument:
+                    inboundPipe = value;
                     break;
 
-                case WorkerProtocol.OutboundHandleArgument:
-                    outboundHandle = value;
+                case WorkerProtocol.OutboundPipeArgument:
+                    outboundPipe = value;
                     break;
 
                 case WorkerProtocol.ParentProcessIdArgument:
@@ -120,9 +138,9 @@ internal static class Program
             }
         }
 
-        if (inboundHandle.Length == 0 || outboundHandle.Length == 0)
+        if (inboundPipe.Length == 0 || outboundPipe.Length == 0)
         {
-            error = "both pipe handles are required.";
+            error = "both pipe names are required.";
             return false;
         }
 

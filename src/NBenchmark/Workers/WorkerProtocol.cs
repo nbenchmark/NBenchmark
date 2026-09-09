@@ -74,7 +74,7 @@ internal static class WorkerProtocol
     ///     the worker ships in the same package as the coordinator, so a mismatch means a stale
     ///     copy on disk, which is worth a loud failure.
     /// </summary>
-    public const int Version = 11;
+    public const int Version = 12;
 
     /// <summary>
     ///     Ceiling on a single frame, so a corrupt or hostile length prefix allocates a bounded
@@ -84,16 +84,25 @@ internal static class WorkerProtocol
     public const int MaxFrameBytes = 64 * 1024 * 1024;
 
     /// <summary>
-    ///     The argument name the coordinator uses to hand the worker the read end of the
-    ///     coordinator-to-worker pipe.
+    ///     The argument name the coordinator uses to name the coordinator-to-worker pipe, which the
+    ///     worker connects to for reading. A name rather than an inherited handle - see
+    ///     <see cref="WorkerTransport" /> for why the transport moved.
     /// </summary>
-    public const string InboundHandleArgument = "--inbound-handle";
+    public const string InboundPipeArgument = "--inbound-pipe";
 
     /// <summary>
-    ///     The argument name the coordinator uses to hand the worker the write end of the
-    ///     worker-to-coordinator pipe.
+    ///     The argument name the coordinator uses to name the worker-to-coordinator pipe, which the
+    ///     worker connects to for writing.
     /// </summary>
-    public const string OutboundHandleArgument = "--outbound-handle";
+    public const string OutboundPipeArgument = "--outbound-pipe";
+
+    /// <summary>
+    ///     How long the worker will wait for the coordinator's pipes to accept it. Deliberately under
+    ///     the coordinator's own <c>WorkerHost.HandshakeTimeout</c>, so a worker that cannot connect
+    ///     dies with a diagnostic on stderr - which the coordinator captures and reports - rather than
+    ///     being reaped as an unexplained silence when the longer deadline expires first.
+    /// </summary>
+    public static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(20);
 
     /// <summary>
     ///     The coordinator's process id, passed for diagnostics only. Orphan avoidance is structural

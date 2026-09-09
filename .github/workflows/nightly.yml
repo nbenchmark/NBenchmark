@@ -1,25 +1,13 @@
 name: Nightly
 
-# Where the two slowest jobs in the repository live. Both are worth running and neither is worth
-# waiting for on every push, and both are skipped on nights when the default branch has not moved
-# since this workflow last passed, so a quiet week costs nothing.
+# Where the slowest job(s) in the repository lives. `samples` runs every sample for real, which takes
+# about ten minutes because measuring real code is the entire point of a sample.
 #
-# `windows-full` is the only Windows coverage there is. ci.yml runs Linux and macOS on every push
-# and no longer touches Windows, because the cost is not the tests but the process starts: the
-# isolation suite spawns a `dotnet exec` measurement worker per test, and process creation is the
-# one operation where Windows is not within a small constant of Linux. That put the push-path
-# Windows job at up to two hours against ten minutes for the other two. It moved here whole rather
-# than trimmed - every test, every framework, nothing filtered - because what Windows uniquely
-# covers is worth having: three kernel32 interop signatures nothing else exercises, the
-# Windows-only thread-priority branch, and pipe semantics that differ from POSIX in both buffer
-# size and handle inheritance, which is the shape of bug this architecture is most exposed to.
+# It is skipped on nights when the default branch has not moved since this workflow last passed, so
+# a quiet week costs nothing.
 #
-# `samples` runs every sample for real, which takes about ten minutes because measuring real code
-# is the entire point of a sample. Behind `needs: build` in ci.yml that ten minutes was serial
-# after the test matrix, so it set the floor on the whole push pipeline at twenty.
-#
-# What both trades cost: a break in either surfaces within a day rather than at the commit that
-# caused it, is attributable to a range of commits rather than one, and blocks no merge.
+# What the trade costs: a broken sample surfaces within a day rather than at the commit that caused
+# it, is attributable to a range of commits rather than one, and blocks no merge.
 
 on:
   schedule:
@@ -38,16 +26,12 @@ permissions:
   actions: read
 
 jobs:
-  # Answers one question, once, for both jobs below: has the default branch moved since this
-  # workflow last passed? Comparing against the last *successful* run, rather than the last run or a
-  # fixed 24-hour window, is what makes this self-correcting. A night that fails re-runs the next
-  # night instead of being written off, and a night GitHub drops - scheduled runs are best-effort
-  # and get dropped under load - does not silently skip whatever landed during it, because the
-  # comparison is to a commit rather than to a clock.
-  #
-  # One gate for both jobs means a failure in either re-runs both the following night. Worth it for
-  # having one place the decision is made, and for the two of them agreeing on which commit they
-  # last vouched for.
+  # Has the default branch moved since this workflow last passed? Comparing against the last
+  # *successful* run, rather than the last run or a fixed 24-hour window, is what makes this
+  # self-correcting. A night that fails re-runs the next night instead of being written off, and a
+  # night GitHub drops - scheduled runs are best-effort and get dropped under load - does not
+  # silently skip whatever landed during it, because the comparison is to a commit rather than to a
+  # clock.
   changes:
     name: Has anything changed?
     runs-on: ubuntu-latest
@@ -92,74 +76,8 @@ jobs:
             echo "Skipped: no new commits since the last successful nightly (${last})." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "should-run=true" >> "$GITHUB_OUTPUT"
-            echo "The branch has moved. Running the full Windows suite and every sample."
+            echo "The branch has moved. Running every sample."
           fi
-
-  windows-full:
-    name: Full Suite (windows-latest)
-    needs: changes
-    if: needs.changes.outputs.should-run == 'true'
-    runs-on: windows-latest
-    # Three frameworks and the whole suite on the slowest platform for it, so a wide ceiling. This
-    # is the configuration that once ran for two hours before the Defender exclusions below; the
-    # point of the number is that it stops, not that it is tight.
-    timeout-minutes: 120
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      # The single biggest lever on this job. Defender scans every newly launched image and its
-      # dependency closure, and the full suite is several hundred `dotnet exec` worker starts per
-      # framework on a 4-vCPU VM.
-      - name: Exclude the build tree from Defender
-        shell: pwsh
-        run: |
-          Add-MpPreference -ExclusionPath "${{ github.workspace }}"
-          Add-MpPreference -ExclusionPath "$env:USERPROFILE\.nuget"
-          Add-MpPreference -ExclusionPath "$env:ProgramFiles\dotnet"
-          Add-MpPreference -ExclusionProcess "dotnet.exe"
-          Add-MpPreference -ExclusionProcess "MSBuild.exe"
-          Add-MpPreference -ExclusionProcess "VBCSCompiler.exe"
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v6
-        with:
-          dotnet-version: |
-            8.0.x
-            9.0.x
-            10.0.x
-
-      - name: Cache NuGet packages
-        uses: actions/cache@v6
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
-
-      - name: Restore dependencies
-        run: dotnet restore
-
-      - name: Build solution
-        run: dotnet build --no-restore --configuration Release
-
-      # No --framework and no --filter: the two things the push job trims are the whole reason this
-      # job exists.
-      - name: Run every test on every framework
-        run: >
-          dotnet test --no-build --configuration Release --verbosity normal
-          --logger trx
-          --results-directory ${{ github.workspace }}/TestResults
-
-      - name: Upload test timings
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: nightly-windows-test-results
-          path: TestResults/**/*.trx
-          if-no-files-found: warn
 
   samples:
     # Every sample, built and *run*. Building them is already covered by the job above - they are in

@@ -38,7 +38,11 @@ The `dotnet benchmark` tool faces a similar problem and uses `NBenchmark.Tool/Fr
 
 ### Coordination
 
-Coordination uses a duplex pair of anonymous pipes carrying length-prefixed UTF-8 JSON frames (`Workers/WorkerProtocol`, `Workers/FrameChannel`). Benchmark bodies are addressed by a tuple of `(assembly, MVID, metadata token)` rather than being serialized (`Workers/BodyRef`, `NBenchmark.Worker/BodyResolver`).
+Coordination uses a duplex pair of named pipes carrying length-prefixed UTF-8 JSON frames (`Workers/WorkerTransport`, `Workers/WorkerProtocol`, `Workers/FrameChannel`). Benchmark bodies are addressed by a tuple of `(assembly, MVID, metadata token)` rather than being serialized (`Workers/BodyRef`, `NBenchmark.Worker/BodyResolver`).
+
+The pipes are named, and opened `PipeOptions.Asynchronous`, because a read has to be cancellable. This was learned the hard way. `AnonymousPipeServerStream` has no `PipeOptions` overload, so on Windows its handle never carries `FILE_FLAG_OVERLAPPED`. `PipeStream.ReadAsync` checks `IsAsync`, finds it false, and falls back to a blocking read on a thread-pool thread - one that observes its cancellation token only before it starts. Every [budget ceiling](#budget-ceilings) was therefore unenforceable on Windows: the token fired and the read did not return. A worker that died while anything still held the write end hung the coordinator indefinitely, and the ceilings that exist to prevent exactly that could do nothing about it.
+
+Named pipes use overlapped I/O, so a cancelled read is really cancelled. The name is a GUID generated per worker, and both ends pass `PipeOptions.CurrentUserOnly`, which builds a restrictive security descriptor on Windows and restricts the socket file's permissions on Unix. Connecting by name also takes handle inheritance out of the design, and with it the question of which other process inherited the write end.
 
 A worker loads the assembly declaring your benchmarks into its own load context, performs attribute discovery, measures with the same engine as the host, and streams results back over the pipe. This has three key consequences:
 

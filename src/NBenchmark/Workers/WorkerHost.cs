@@ -167,8 +167,13 @@ internal sealed class WorkerHost : IAsyncDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workerAssemblyPath);
 
-        var toWorker = new AnonymousPipeServerStream(PipeDirection.Out, HandleInheritability.Inheritable);
-        var fromWorker = new AnonymousPipeServerStream(PipeDirection.In, HandleInheritability.Inheritable);
+        // Named rather than inherited, so the read below is genuinely cancellable on Windows. See
+        // WorkerTransport for the whole of that argument.
+        var inboundPipeName = WorkerTransport.NewPipeName();
+        var outboundPipeName = WorkerTransport.NewPipeName();
+
+        var toWorker = WorkerTransport.CreateServer(inboundPipeName, PipeDirection.Out);
+        var fromWorker = WorkerTransport.CreateServer(outboundPipeName, PipeDirection.In);
 
         Process? process = null;
 
@@ -199,10 +204,10 @@ internal sealed class WorkerHost : IAsyncDisposable
             }
 
             startInfo.ArgumentList.Add(workerAssemblyPath);
-            startInfo.ArgumentList.Add(WorkerProtocol.InboundHandleArgument);
-            startInfo.ArgumentList.Add(toWorker.GetClientHandleAsString());
-            startInfo.ArgumentList.Add(WorkerProtocol.OutboundHandleArgument);
-            startInfo.ArgumentList.Add(fromWorker.GetClientHandleAsString());
+            startInfo.ArgumentList.Add(WorkerProtocol.InboundPipeArgument);
+            startInfo.ArgumentList.Add(inboundPipeName);
+            startInfo.ArgumentList.Add(WorkerProtocol.OutboundPipeArgument);
+            startInfo.ArgumentList.Add(outboundPipeName);
             startInfo.ArgumentList.Add(WorkerProtocol.ParentProcessIdArgument);
             startInfo.ArgumentList.Add(Environment.ProcessId.ToString());
 
@@ -228,10 +233,7 @@ internal sealed class WorkerHost : IAsyncDisposable
             ChildProcessReaper.Track(process.Id, process);
             process.BeginErrorReadLine();
 
-            // The parent's own copies must go, or the worker's exit is never visible as
-            // end-of-stream and a read here would block forever on a dead process.
-            toWorker.DisposeLocalCopyOfClientHandle();
-            fromWorker.DisposeLocalCopyOfClientHandle();
+            await ConnectAsync(toWorker, fromWorker, process, stderr, cancellationToken).ConfigureAwait(false);
 
             var channel = new FrameChannel(fromWorker, toWorker);
             var ready = await HandshakeAsync(channel, process, stderr, cancellationToken).ConfigureAwait(false);
@@ -253,6 +255,89 @@ internal sealed class WorkerHost : IAsyncDisposable
             throw;
         }
     }
+
+    /// <summary>
+    ///     Waits for the worker to connect to both pipes, or for it to die trying.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Both waits run together rather than one after the other. They are independent pipes and
+    ///         the worker connects to them in its own order, so awaiting them in sequence would be
+    ///         correct but would spend the deadline twice over on a worker that is merely slow.
+    ///     </para>
+    ///     <para>
+    ///         The race against process exit is what the anonymous-pipe version got for free and this
+    ///         one has to ask for. A worker that dies on startup - bad arguments, a missing shared
+    ///         framework, a static initializer that throws - used to surface immediately, because the
+    ///         inherited write handle died with it and the handshake read hit end-of-stream. A worker
+    ///         that never connects to a named pipe produces no such signal, so without this the caller
+    ///         would wait the full <see cref="HandshakeTimeout" /> and then report a timeout for what
+    ///         is really a crash with an exit code and stderr worth printing.
+    ///     </para>
+    /// </remarks>
+    /// <param name="toWorker">The coordinator-to-worker pipe, awaiting its client.</param>
+    /// <param name="fromWorker">The worker-to-coordinator pipe, awaiting its client.</param>
+    /// <param name="process">The worker, so its death can end the wait early.</param>
+    /// <param name="stderr">The worker's captured stderr, for the diagnostic if it died.</param>
+    /// <param name="cancellationToken">Cancels the wait while it is in progress.</param>
+    private static async Task ConnectAsync(
+        NamedPipeServerStream toWorker,
+        NamedPipeServerStream fromWorker,
+        Process process,
+        StderrBuffer stderr,
+        CancellationToken cancellationToken)
+    {
+        using var timeoutCts = new CancellationTokenSource(HandshakeTimeout);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
+        var connected = Task.WhenAll(
+            toWorker.WaitForConnectionAsync(linked.Token),
+            fromWorker.WaitForConnectionAsync(linked.Token));
+
+        // Uncancelled deliberately. Cancelling this once the pipes are up would leave a cancelled
+        // task nobody awaits, and the alternative costs nothing: an uncancelled wait completes
+        // quietly whenever the worker eventually exits, which it will.
+        var exited = process.WaitForExitAsync(CancellationToken.None);
+
+        try
+        {
+            if (await Task.WhenAny(connected, exited).ConfigureAwait(false) == exited)
+            {
+                // Nothing awaits the connect after this. It is still pending, and it will fault the
+                // moment the caller's catch disposes both streams on the way out - so it has to be
+                // observed here, or that fault surfaces later as an unobserved task exception in
+                // whatever process the developer was benchmarking.
+                Observe(connected);
+
+                throw new WorkerStartException(
+                    "The measurement worker exited before it connected to the coordinator "
+                    + $"({ExitCodeDescription.Describe(process.ExitCode)}).{DescribeStderr(stderr)}");
+            }
+
+            // Both waits are inside this one, and awaiting it observes them.
+            await connected.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested
+                                                 && !cancellationToken.IsCancellationRequested)
+        {
+            throw new WorkerStartException(
+                $"The measurement worker did not connect within {HandshakeTimeout.TotalSeconds:0.#}s. "
+                + "It is running but never reached its pipes, which means it is wedged before "
+                + $"NBenchmark's own entry point.{DescribeStderr(stderr)}");
+        }
+    }
+
+    /// <summary>
+    ///     Marks a task nobody will await as observed, so its eventual failure does not reach
+    ///     <see cref="TaskScheduler.UnobservedTaskException" />.
+    /// </summary>
+    /// <param name="task">The abandoned task.</param>
+    private static void Observe(Task task)
+        => _ = task.ContinueWith(
+            static t => _ = t.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
 
     private static async Task<ReadyPayload> HandshakeAsync(
         FrameChannel channel,
